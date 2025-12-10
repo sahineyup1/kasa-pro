@@ -137,11 +137,17 @@ export default function SuppliersPage() {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [viesDialogOpen, setViesDialogOpen] = useState(false);
 
-  // Load suppliers from RTDB
+  // Load suppliers from RTDB (partners collection filtered by isSupplier)
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = subscribeToRTDB('suppliers', (data) => {
-      setSuppliers(data || []);
+    const unsubscribe = subscribeToRTDB('partners', (data) => {
+      // Sadece tedarikçileri filtrele (type.isSupplier veya basic.partnerTypes.isSupplier)
+      const suppliers = (data || []).filter((p: any) => {
+        const isSupplier = p.type?.isSupplier || p.basic?.partnerTypes?.isSupplier;
+        const isDeleted = p.basic?.status === 'deleted';
+        return isSupplier && !isDeleted;
+      });
+      setSuppliers(suppliers);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -240,11 +246,11 @@ export default function SuppliersPage() {
 
       // Update based on structure
       if (supplier.basic) {
-        await updateData(`suppliers/${supplier.id}/basic`, {
+        await updateData(`partners/${supplier.id}/basic`, {
           isActive: newStatus,
         });
       } else {
-        await updateData(`suppliers/${supplier.id}`, {
+        await updateData(`partners/${supplier.id}`, {
           isActive: newStatus,
           updatedAt: new Date().toISOString(),
         });
@@ -260,7 +266,7 @@ export default function SuppliersPage() {
     if (!confirm(`"${name}" tedarikciyi silmek istediginize emin misiniz?`)) return;
 
     try {
-      await removeData(`suppliers/${supplier.id}`);
+      await removeData(`partners/${supplier.id}`);
     } catch (error) {
       console.error('Delete error:', error);
       alert('Silme hatasi: ' + (error as Error).message);

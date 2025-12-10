@@ -294,13 +294,19 @@ export function CustomerDialog({
         notes: notes.trim(),
         isActive: true,
         updatedAt: new Date().toISOString(),
+        // Partner tipi - müşteri olarak işaretle
+        type: {
+          isCustomer: true,
+          isSupplier: false,
+          isBoth: false,
+        },
       };
 
       if (isEditMode) {
-        await updateData(`customers/${customer.id}`, customerData);
+        await updateData(`partners/${customer.id}`, customerData);
       } else {
         (customerData as any).createdAt = new Date().toISOString();
-        await pushData('customers', customerData);
+        await pushData('partners', customerData);
       }
 
       onSave?.();

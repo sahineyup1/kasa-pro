@@ -124,16 +124,21 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
-    // RTDB'den müşterileri dinle
-    const unsubscribe = subscribeToRTDB('customers', (data) => {
-      const activeCustomers = data
-        .filter((c: Customer) => c.isActive !== false)
+    // RTDB'den partners koleksiyonundan müşterileri dinle
+    const unsubscribe = subscribeToRTDB('partners', (data) => {
+      // Sadece müşterileri filtrele (type.isCustomer veya basic.partnerTypes.isCustomer)
+      const customers = data
+        .filter((p: any) => {
+          const isCustomer = p.type?.isCustomer || p.basic?.partnerTypes?.isCustomer;
+          const isActive = p.isActive !== false && p.basic?.status !== 'deleted';
+          return isCustomer && isActive;
+        })
         .sort((a: Customer, b: Customer) => {
           const nameA = a.basic?.name || a.name || a.companyName || '';
           const nameB = b.basic?.name || b.name || b.companyName || '';
           return nameA.localeCompare(nameB);
         });
-      setCustomers(activeCustomers);
+      setCustomers(customers);
       setLoading(false);
     });
 
@@ -221,7 +226,7 @@ export default function CustomersPage() {
     const name = getField(customer, 'name') || getField(customer, 'companyName') || 'Bu müşteri';
     if (confirm(`"${name}" müşterisini silmek istediğinize emin misiniz?`)) {
       try {
-        await removeData(`customers/${customer.id}`);
+        await removeData(`partners/${customer.id}`);
       } catch (error) {
         console.error('Delete error:', error);
         alert('Silme hatası: ' + (error as Error).message);
@@ -234,6 +239,7 @@ export default function CustomersPage() {
     // subscribeToFirestore zaten real-time, bu sadece UI feedback için
     setTimeout(() => setLoading(false), 500);
   };
+
 
   if (loading) {
     return (

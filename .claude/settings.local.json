@@ -18,7 +18,8 @@
       "Bash(git config:*)",
       "Bash(dir:*)",
       "Bash(del \"C:\\Users\\Sahin\\Desktop\\kasa-pro\\.git\\index.lock\")",
-      "Bash(if exist \".git\\index.lock\" del /f \".git\\index.lock\")"
+      "Bash(if exist \".git\\index.lock\" del /f \".git\\index.lock\")",
+      "Bash(curl:*)"
     ]
   }
 }

@@ -25,7 +25,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { addFirestoreData, updateFirestoreData } from '@/services/firebase';
+import { pushData, updateData } from '@/services/firebase';
 import { Loader2, CheckCircle2, XCircle, Globe } from 'lucide-react';
 
 // Country options
@@ -376,13 +376,24 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
     setSaving(true);
     try {
       const supplierData = {
+        // Partner tipi - tedarikçi olarak işaretle
+        type: {
+          isCustomer: false,
+          isSupplier: true,
+          isBoth: false,
+        },
         basic: {
           name: name.trim(),
           shortName: shortName.trim() || name.trim().substring(0, 30),
           country,
-          type,
+          type: type, // wholesaler, manufacturer, distributor
           isActive,
           categories: categories.split(',').map((c) => c.trim()).filter(Boolean),
+          // Legacy support
+          partnerTypes: {
+            isCustomer: false,
+            isSupplier: true,
+          },
         },
         contact: {
           address: {
@@ -427,9 +438,11 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
       };
 
       if (isEditMode && supplier?.id) {
-        await updateFirestoreData('suppliers', supplier.id, supplierData);
+        // partners koleksiyonuna kaydet
+        await updateData(`partners/${supplier.id}`, supplierData);
       } else {
-        await addFirestoreData('suppliers', {
+        // partners koleksiyonuna yeni tedarikçi ekle
+        await pushData('partners', {
           ...supplierData,
           createdAt: new Date().toISOString(),
         });
