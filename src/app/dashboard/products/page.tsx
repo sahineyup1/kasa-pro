@@ -332,42 +332,42 @@ export default function ProductsPage() {
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b px-8 py-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white border-b px-4 lg:px-8 py-4 lg:py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Urunler</h1>
+            <h1 className="text-xl lg:text-2xl font-semibold text-gray-900">Urunler</h1>
             <p className="text-sm text-gray-500 mt-1">
               {stats.total} urun - {stats.active} aktif
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
               disabled={loading}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Yenile
+              <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Yenile</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={handleOpenReport}
             >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Rapor
+              <BarChart3 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Rapor</span>
             </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Yeni Urun
+            <Button onClick={handleCreate} size="sm">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Yeni Urun</span>
             </Button>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-4 lg:mb-6">
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -417,8 +417,8 @@ export default function ProductsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Urun ara (isim, barkod, SKU)..."
@@ -429,7 +429,7 @@ export default function ProductsPage() {
           </div>
 
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[220px]">
+            <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue placeholder="Kategori" />
             </SelectTrigger>
             <SelectContent>
@@ -444,9 +444,9 @@ export default function ProductsPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto p-8">
-        <div className="bg-white rounded-lg border">
-          <Table>
+      <div className="flex-1 overflow-auto p-4 lg:p-8">
+        <div className="bg-white rounded-lg border overflow-x-auto">
+          <Table className="min-w-[700px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[130px]">Barkod</TableHead>
@@ -543,8 +543,8 @@ export default function ProductsPage() {
       </div>
 
       {/* Footer with pagination and stats */}
-      <div className="bg-white border-t px-8 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+      <div className="bg-white border-t px-4 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm text-gray-600">
           <span>📦 Toplam: {stats.total}</span>
           <span>✅ Aktif: {stats.active}</span>
           <span>⚠️ Dusuk Stok: {stats.lowStock}</span>

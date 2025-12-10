@@ -324,7 +324,7 @@ export default function SaleInvoicesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tum Subeler</SelectItem>
-                  {branches.filter(b => b.isActive !== false).map((branch) => (
+                  {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name}
                     </SelectItem>

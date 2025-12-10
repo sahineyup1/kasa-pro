@@ -1260,7 +1260,7 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
                         <SelectValue placeholder="Tedarikci secin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {suppliers.map((sup) => (
+                        {suppliers.filter(s => s.id).map((sup) => (
                           <SelectItem key={sup.id} value={sup.id}>
                             {sup.basic?.name || sup.name || sup.id}
                           </SelectItem>

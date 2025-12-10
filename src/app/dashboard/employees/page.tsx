@@ -25,12 +25,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { subscribeToFirestore, updateFirestoreData, deleteFirestoreData } from '@/services/firebase';
+import { subscribeToData, updateData, removeData } from '@/services/firebase';
 import { EmployeeDialog } from '@/components/dialogs/employee-dialog';
+import { LeaveDialog } from '@/components/dialogs/leave-dialog';
+import { BulkSalaryDialog } from '@/components/dialogs/bulk-salary-dialog';
 import {
   Plus, RefreshCw, MoreHorizontal, Pencil, Trash2, Eye, Search,
-  Users, UserCheck, AlertTriangle, Wallet, Calendar, FileText
+  Users, UserCheck, AlertTriangle, Wallet, Calendar, FileText, Banknote
 } from 'lucide-react';
+import { pushData } from '@/services/firebase';
 
 // Role labels
 const ROLE_LABELS: Record<string, string> = {
@@ -74,9 +77,28 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Format date as dd.mm.yyyy
+function formatDateTR(dateStr: string | null): string {
+  if (!dateStr) return '-';
+  try {
+    const date = new Date(dateStr);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 // Visa warning badge
 function VisaBadge({ expiryDate }: { expiryDate: string | null }) {
   if (!expiryDate) return <span className="text-gray-400">-</span>;
+
+  // "9999-12-31" means permanent/unlimited
+  if (expiryDate === '9999-12-31' || expiryDate.startsWith('9999')) {
+    return <span className="text-green-600 font-medium">Suresiz</span>;
+  }
 
   const expiry = new Date(expiryDate);
   const today = new Date();
@@ -90,13 +112,14 @@ function VisaBadge({ expiryDate }: { expiryDate: string | null }) {
     return <span className="text-yellow-600">{daysLeft} gun</span>;
   }
 
-  return <span className="text-gray-600">{expiryDate}</span>;
+  return <span className="text-gray-600">{formatDateTR(expiryDate)}</span>;
 }
 
 interface Employee {
   id: string;
   firstName?: string;
   lastName?: string;
+  fullName?: string;
   role?: string;
   branch?: string;
   branchId?: string;
@@ -161,12 +184,73 @@ export default function EmployeesPage() {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
 
-  // Load employees from Firestore
+  // Load employees from RTDB (same as Python desktop app: erp/employees)
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = subscribeToFirestore('employees', (data) => {
-      setEmployees(data || []);
+    const unsubscribe = subscribeToData('employees', (data) => {
+      if (data) {
+        // Convert RTDB object to array with IDs
+        const employeeList = Object.entries(data).map(([id, emp]: [string, any]) => {
+          // Python structure uses personal_info.full_name
+          const fullName = emp.personal_info?.full_name || '';
+          const nameParts = fullName.split(' ');
+          const firstName = emp.personal_info?.first_name || nameParts[0] || emp.firstName || '';
+          const lastName = emp.personal_info?.last_name || nameParts.slice(1).join(' ') || emp.lastName || '';
+
+          return {
+            id,
+            ...emp,
+            // Map Python structure to web structure
+            firstName,
+            lastName,
+            fullName,
+            role: emp.employment_info?.role || emp.role || '',
+            branch: emp.employment_info?.branch || emp.branch || '',
+            branchId: emp.employment_info?.branch_id || emp.branchId || '',
+            position: emp.employment_info?.position || emp.position || '',
+            phone: emp.personal_info?.phone || emp.phone || '',
+            email: emp.personal_info?.email || emp.email || '',
+            salary: emp.salary_info?.monthly_salary || emp.salary || 0,
+            cashSalary: emp.salary_info?.cash_salary || 0,
+            sgkIncluded: emp.salary_info?.sgk_included || false,
+            status: emp.status || emp.employment_info?.status || 'active',
+            startDate: emp.employment_info?.start_date || emp.startDate || '',
+            visaExpiry: emp.visa_info?.visa_expiry_date || emp.documents?.visa_expiry_date || emp.visaExpiry || '',
+            residenceType: emp.visa_info?.residence_type || '',
+            documentExpiry: emp.visa_info?.document_expiry_date || emp.documents?.document_expiry_date || emp.documentExpiry || '',
+            notes: emp.notes || '',
+            // Keep nested structure for compatibility
+            personal: {
+              firstName,
+              lastName,
+              fullName,
+              phone: emp.personal_info?.phone || emp.phone || '',
+              email: emp.personal_info?.email || emp.email || '',
+            },
+            employment: {
+              role: emp.employment_info?.role || emp.role || '',
+              branch: emp.employment_info?.branch || emp.branch || '',
+              branchId: emp.employment_info?.branch_id || emp.branchId || '',
+              position: emp.employment_info?.position || emp.position || '',
+              salary: emp.salary_info?.monthly_salary || emp.salary || 0,
+              status: emp.status || emp.employment_info?.status || 'active',
+              startDate: emp.employment_info?.start_date || emp.startDate || '',
+            },
+            documents: {
+              visaExpiry: emp.visa_info?.visa_expiry_date || emp.documents?.visa_expiry_date || emp.visaExpiry || '',
+              documentExpiry: emp.visa_info?.document_expiry_date || emp.documents?.document_expiry_date || emp.documentExpiry || '',
+            },
+          };
+        });
+        console.log('Employees loaded from RTDB:', employeeList.length);
+        setEmployees(employeeList);
+      } else {
+        console.log('No employees in RTDB');
+        setEmployees([]);
+      }
       setLoading(false);
     });
     return () => unsubscribe();
@@ -274,20 +358,15 @@ export default function EmployeesPage() {
 
   const handleToggleStatus = async (employee: Employee) => {
     try {
-      const currentStatus = getField(employee, ['employment', 'status'], 'status', 'active');
+      const currentStatus = employee.status || getField(employee, ['employment', 'status'], 'status', 'active');
       const newStatus = currentStatus === 'active' || currentStatus === 'aktif' ? 'inactive' : 'active';
 
-      if (employee.employment) {
-        await updateFirestoreData('employees', employee.id, {
-          'employment.status': newStatus,
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        await updateFirestoreData('employees', employee.id, {
-          status: newStatus,
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      // Update in RTDB (erp/employees/{id})
+      await updateData(`employees/${employee.id}`, {
+        status: newStatus,
+        'employment_info/status': newStatus,
+        updatedAt: new Date().toISOString(),
+      });
     } catch (error) {
       console.error('Status update error:', error);
       alert('Durum guncellenemedi: ' + (error as Error).message);
@@ -295,17 +374,76 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async (employee: Employee) => {
-    const firstName = getField(employee, ['personal', 'firstName'], 'firstName', '');
-    const lastName = getField(employee, ['personal', 'lastName'], 'lastName', '');
-    const name = `${firstName} ${lastName}`.trim() || 'Personel';
+    const name = employee.fullName || `${employee.firstName} ${employee.lastName}`.trim() || 'Personel';
 
     if (!confirm(`"${name}" personelini silmek istediginize emin misiniz?`)) return;
 
     try {
-      await deleteFirestoreData('employees', employee.id);
+      // Delete from RTDB (erp/employees/{id})
+      await removeData(`employees/${employee.id}`);
     } catch (error) {
       console.error('Delete error:', error);
       alert('Silme hatasi: ' + (error as Error).message);
+    }
+  };
+
+  // Elden maaş ödeme
+  const handlePayCashSalary = async (employee: Employee) => {
+    const name = employee.fullName || `${employee.firstName} ${employee.lastName}`.trim() || 'Personel';
+    const cashSalary = (employee as any).salary_info?.cash_salary || (employee as any).cashSalary || 0;
+
+    if (cashSalary <= 0) {
+      alert('Bu personelin elden maasi tanimli degil!');
+      return;
+    }
+
+    const amountStr = prompt(
+      `${name} icin elden odeme tutari:\n\nTanimli elden maas: €${cashSalary.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
+      String(cashSalary)
+    );
+
+    if (!amountStr) return;
+
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Gecersiz tutar!');
+      return;
+    }
+
+    if (!confirm(`${name}'e €${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} elden odeme yapilacak. Onayliyor musunuz?`)) {
+      return;
+    }
+
+    try {
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      const today = new Date().toISOString().split('T')[0];
+
+      const salaryRecord = {
+        employeeId: employee.id,
+        employeeName: name,
+        amount: amount,
+        grossAmount: cashSalary,
+        paymentDate: today,
+        paymentType: 'cash',
+        paymentMethod: 'cash',
+        type: 'salary',
+        status: 'paid',
+        createdAt: new Date().toISOString(),
+        month: currentMonth,
+      };
+
+      await pushData('salary_payments', salaryRecord);
+
+      await updateData(`employees/${employee.id}/salary_info`, {
+        lastCashPaymentDate: today,
+        lastCashPaymentMonth: currentMonth,
+        lastCashPayment: amount,
+      });
+
+      alert(`${name}'e €${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} elden odeme yapildi!`);
+    } catch (error) {
+      console.error('Cash payment error:', error);
+      alert('Odeme hatasi: ' + (error as Error).message);
     }
   };
 
@@ -331,11 +469,11 @@ export default function EmployeesPage() {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Yenile
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setLeaveDialogOpen(true)}>
               <Calendar className="h-4 w-4 mr-2" />
               Izin/Rapor
             </Button>
-            <Button variant="outline" size="sm" className="bg-green-600 hover:bg-green-700 text-white border-0">
+            <Button variant="outline" size="sm" className="bg-green-600 hover:bg-green-700 text-white border-0" onClick={() => setSalaryDialogOpen(true)}>
               <Wallet className="h-4 w-4 mr-2" />
               Toplu Maas Ode
             </Button>
@@ -479,15 +617,20 @@ export default function EmployeesPage() {
                 </TableRow>
               ) : (
                 filteredEmployees.map((employee) => {
-                  const firstName = getField(employee, ['personal', 'firstName'], 'firstName', '');
-                  const lastName = getField(employee, ['personal', 'lastName'], 'lastName', '');
-                  const fullName = `${firstName} ${lastName}`.trim() || 'Bilinmiyor';
-                  const role = getField(employee, ['employment', 'role'], 'role', '-');
-                  const branch = getField(employee, ['employment', 'branch'], 'branch', '-');
-                  const phone = getField(employee, ['personal', 'phone'], 'phone', '-');
-                  const salary = getField(employee, ['employment', 'salary'], 'salary', 0);
-                  const status = getField(employee, ['employment', 'status'], 'status', 'active');
-                  const visaExpiry = getField(employee, ['documents', 'visaExpiry'], 'visaExpiry', null);
+                  // Use fullName directly from RTDB Python structure
+                  const fullName = employee.fullName ||
+                    getField(employee, ['personal', 'fullName'], 'fullName', '') ||
+                    `${getField(employee, ['personal', 'firstName'], 'firstName', '')} ${getField(employee, ['personal', 'lastName'], 'lastName', '')}`.trim() ||
+                    'Bilinmiyor';
+                  const firstName = employee.firstName || getField(employee, ['personal', 'firstName'], 'firstName', fullName.split(' ')[0] || '');
+                  const lastName = employee.lastName || getField(employee, ['personal', 'lastName'], 'lastName', fullName.split(' ').slice(1).join(' ') || '');
+                  const role = employee.role || getField(employee, ['employment', 'role'], 'role', '-');
+                  const branch = employee.branch || getField(employee, ['employment', 'branch'], 'branch', '-');
+                  const phone = employee.phone || getField(employee, ['personal', 'phone'], 'phone', '-');
+                  const email = employee.email || getField(employee, ['personal', 'email'], 'email', '');
+                  const salary = employee.salary || getField(employee, ['employment', 'salary'], 'salary', 0);
+                  const status = employee.status || getField(employee, ['employment', 'status'], 'status', 'active');
+                  const visaExpiry = employee.visaExpiry || getField(employee, ['documents', 'visaExpiry'], 'visaExpiry', null);
 
                   return (
                     <TableRow key={employee.id} className="hover:bg-gray-50">
@@ -498,7 +641,7 @@ export default function EmployeesPage() {
                           </div>
                           <div>
                             <p className="font-medium">{fullName}</p>
-                            <p className="text-sm text-gray-500">{getField(employee, ['personal', 'email'], 'email', '')}</p>
+                            <p className="text-sm text-gray-500">{email}</p>
                           </div>
                         </div>
                       </TableCell>
@@ -537,6 +680,14 @@ export default function EmployeesPage() {
                               Maas Gecmisi
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handlePayCashSalary(employee)}
+                              className="text-green-600"
+                            >
+                              <Banknote className="h-4 w-4 mr-2" />
+                              Elden Maas Ode
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleToggleStatus(employee)}>
                               {status === 'active' || status === 'aktif' ? '⏸️ Pasif Yap' : '▶️ Aktif Yap'}
                             </DropdownMenuItem>
@@ -566,6 +717,20 @@ export default function EmployeesPage() {
         onOpenChange={setDialogOpen}
         employee={selectedEmployee}
         onSave={() => setDialogOpen(false)}
+      />
+
+      {/* Leave Dialog */}
+      <LeaveDialog
+        open={leaveDialogOpen}
+        onOpenChange={setLeaveDialogOpen}
+        employees={employees}
+      />
+
+      {/* Bulk Salary Dialog */}
+      <BulkSalaryDialog
+        open={salaryDialogOpen}
+        onOpenChange={setSalaryDialogOpen}
+        employees={employees}
       />
     </div>
   );

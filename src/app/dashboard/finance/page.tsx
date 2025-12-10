@@ -1132,7 +1132,7 @@ export default function FinancePage() {
                     <SelectValue placeholder="Sube secin..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {branches.filter(b => b.isActive !== false).map((branch) => (
+                    {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
                         <div className="flex items-center gap-2">
                           <Store className="h-4 w-4" />
@@ -1286,7 +1286,7 @@ export default function FinancePage() {
                     <SelectValue placeholder="Sube secin..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {branches.filter(b => b.isActive !== false).map((branch) => {
+                    {branches.filter(b => b.id && b.isActive !== false).map((branch) => {
                       const bankAccs = branch.treasury?.bankAccounts;
                       const accountCount = bankAccs ? Object.keys(bankAccs).length : 0;
                       return (

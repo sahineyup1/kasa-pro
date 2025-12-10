@@ -278,21 +278,19 @@ export default function VehiclesPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Araçlar</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Araçlar</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
             Araç, yakıt ve bakım yönetimi
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={handleAddClick}>
-            <Plus className="h-4 w-4 mr-2" />
-            {activeTab === 'vehicles' && 'Yeni Arac'}
-            {activeTab === 'fuel' && 'Yakit Ekle'}
-            {activeTab === 'maintenance' && 'Bakim Ekle'}
-          </Button>
-        </div>
+        <Button size="sm" onClick={handleAddClick} className="w-full sm:w-auto">
+          <Plus className="h-4 w-4 mr-2" />
+          {activeTab === 'vehicles' && 'Yeni Arac'}
+          {activeTab === 'fuel' && 'Yakit Ekle'}
+          {activeTab === 'maintenance' && 'Bakim Ekle'}
+        </Button>
       </div>
 
       {/* Expiry Warnings */}
@@ -317,7 +315,7 @@ export default function VehiclesPage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 lg:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -369,10 +367,12 @@ export default function VehiclesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant={activeTab === 'vehicles' ? 'default' : 'outline'}
           onClick={() => setActiveTab('vehicles')}
+          size="sm"
+          className="flex-1 sm:flex-none"
         >
           <Car className="h-4 w-4 mr-2" />
           Araçlar
@@ -380,6 +380,8 @@ export default function VehiclesPage() {
         <Button
           variant={activeTab === 'fuel' ? 'default' : 'outline'}
           onClick={() => setActiveTab('fuel')}
+          size="sm"
+          className="flex-1 sm:flex-none"
         >
           <Fuel className="h-4 w-4 mr-2" />
           Yakıt
@@ -387,6 +389,8 @@ export default function VehiclesPage() {
         <Button
           variant={activeTab === 'maintenance' ? 'default' : 'outline'}
           onClick={() => setActiveTab('maintenance')}
+          size="sm"
+          className="flex-1 sm:flex-none"
         >
           <Wrench className="h-4 w-4 mr-2" />
           Bakım
@@ -411,17 +415,17 @@ export default function VehiclesPage() {
 
       {/* Content */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 overflow-x-auto">
           {activeTab === 'vehicles' && (
-            <Table>
+            <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Plaka</TableHead>
                   <TableHead>Marka/Model</TableHead>
-                  <TableHead>Yıl</TableHead>
-                  <TableHead>Tip</TableHead>
-                  <TableHead>Yakıt</TableHead>
-                  <TableHead className="text-right">KM</TableHead>
+                  <TableHead className="hidden md:table-cell">Yıl</TableHead>
+                  <TableHead className="hidden sm:table-cell">Tip</TableHead>
+                  <TableHead className="hidden lg:table-cell">Yakıt</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">KM</TableHead>
                   <TableHead>Durum</TableHead>
                   <TableHead className="w-[100px]">İşlem</TableHead>
                 </TableRow>
@@ -439,10 +443,10 @@ export default function VehiclesPage() {
                     <TableRow key={vehicle.id}>
                       <TableCell className="font-medium">{vehicle.plate}</TableCell>
                       <TableCell>{vehicle.brand} {vehicle.model}</TableCell>
-                      <TableCell>{vehicle.year}</TableCell>
-                      <TableCell>{vehicleTypeLabels[vehicle.type] || vehicle.type}</TableCell>
-                      <TableCell>{fuelTypeLabels[vehicle.fuelType] || vehicle.fuelType}</TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="hidden md:table-cell">{vehicle.year}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{vehicleTypeLabels[vehicle.type] || vehicle.type}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{fuelTypeLabels[vehicle.fuelType] || vehicle.fuelType}</TableCell>
+                      <TableCell className="text-right font-mono hidden md:table-cell">
                         {vehicle.km?.toLocaleString() || '-'}
                       </TableCell>
                       <TableCell>
@@ -486,16 +490,16 @@ export default function VehiclesPage() {
           )}
 
           {activeTab === 'fuel' && (
-            <Table>
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Tarih</TableHead>
                   <TableHead>Plaka</TableHead>
                   <TableHead className="text-right">Litre</TableHead>
-                  <TableHead className="text-right">Birim Fiyat</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Birim Fiyat</TableHead>
                   <TableHead className="text-right">Toplam</TableHead>
-                  <TableHead className="text-right">KM</TableHead>
-                  <TableHead>Istasyon</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">KM</TableHead>
+                  <TableHead className="hidden lg:table-cell">Istasyon</TableHead>
                   <TableHead className="w-[100px]">Islem</TableHead>
                 </TableRow>
               </TableHeader>
@@ -513,10 +517,10 @@ export default function VehiclesPage() {
                       <TableCell>{formatDate(fuel.date)}</TableCell>
                       <TableCell className="font-medium">{getVehiclePlate(fuel.vehicleId)}</TableCell>
                       <TableCell className="text-right font-mono">{fuel.liters?.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(fuel.pricePerLiter || 0)}</TableCell>
+                      <TableCell className="text-right font-mono hidden sm:table-cell">{formatCurrency(fuel.pricePerLiter || 0)}</TableCell>
                       <TableCell className="text-right font-mono font-medium">{formatCurrency(fuel.totalAmount || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{fuel.km?.toLocaleString()}</TableCell>
-                      <TableCell>{fuel.station || '-'}</TableCell>
+                      <TableCell className="text-right font-mono hidden md:table-cell">{fuel.km?.toLocaleString()}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{fuel.station || '-'}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button
@@ -545,16 +549,16 @@ export default function VehiclesPage() {
           )}
 
           {activeTab === 'maintenance' && (
-            <Table>
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Tarih</TableHead>
                   <TableHead>Plaka</TableHead>
-                  <TableHead>Tip</TableHead>
-                  <TableHead>Aciklama</TableHead>
+                  <TableHead className="hidden sm:table-cell">Tip</TableHead>
+                  <TableHead className="hidden lg:table-cell">Aciklama</TableHead>
                   <TableHead className="text-right">Tutar</TableHead>
-                  <TableHead className="text-right">KM</TableHead>
-                  <TableHead>Servis</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">KM</TableHead>
+                  <TableHead className="hidden md:table-cell">Servis</TableHead>
                   <TableHead className="w-[100px]">Islem</TableHead>
                 </TableRow>
               </TableHeader>
@@ -571,11 +575,11 @@ export default function VehiclesPage() {
                     <TableRow key={m.id}>
                       <TableCell>{formatDate(m.date)}</TableCell>
                       <TableCell className="font-medium">{getVehiclePlate(m.vehicleId)}</TableCell>
-                      <TableCell>{m.type}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{m.description || '-'}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{m.type}</TableCell>
+                      <TableCell className="max-w-[200px] truncate hidden lg:table-cell">{m.description || '-'}</TableCell>
                       <TableCell className="text-right font-mono font-medium">{formatCurrency(m.cost || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{m.km?.toLocaleString()}</TableCell>
-                      <TableCell>{m.vendor || '-'}</TableCell>
+                      <TableCell className="text-right font-mono hidden md:table-cell">{m.km?.toLocaleString()}</TableCell>
+                      <TableCell className="hidden md:table-cell">{m.vendor || '-'}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button

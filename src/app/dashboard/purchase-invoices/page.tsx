@@ -218,49 +218,51 @@ export default function PurchaseInvoicesPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Alış Faturaları</h1>
-          <p className="text-muted-foreground">
-            Tedarikçilerden alınan faturalar
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Yenile
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Upload className="h-4 w-4 mr-2" />
-                İçe Aktar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setXmlImportOpen(true)}>
-                <FileCode className="h-4 w-4 mr-2" />
-                XML Fatura (e-Fatura)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setExcelImportOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Excel Dosyası
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Dışa Aktar
-          </Button>
-          <Button size="sm" onClick={handleNewInvoice}>
-            <Plus className="h-4 w-4 mr-2" />
-            Yeni Fatura
-          </Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Alış Faturaları</h1>
+            <p className="text-muted-foreground text-sm lg:text-base">
+              Tedarikçilerden alınan faturalar
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} className="flex-1 sm:flex-none">
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Yenile</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                  <Upload className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">İçe Aktar</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setXmlImportOpen(true)}>
+                  <FileCode className="h-4 w-4 mr-2" />
+                  XML Fatura (e-Fatura)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setExcelImportOpen(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Excel Dosyası
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" className="hidden md:flex">
+              <Download className="h-4 w-4 mr-2" />
+              Dışa Aktar
+            </Button>
+            <Button size="sm" onClick={handleNewInvoice} className="flex-1 sm:flex-none">
+              <Plus className="h-4 w-4 mr-2" />
+              Yeni Fatura
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 lg:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -314,9 +316,9 @@ export default function PurchaseInvoicesPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-1 gap-4">
-              <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="search"
@@ -328,39 +330,39 @@ export default function PurchaseInvoicesPage() {
               </div>
 
               <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <Store className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Sube" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tum Subeler</SelectItem>
-                  {branches.filter(b => b.isActive !== false).map((branch) => (
+                  {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
 
-              <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedStatus === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedStatus('all')}
+              >
+                Tumu
+              </Button>
+              {Object.entries(statusLabels).map(([key, { label }]) => (
                 <Button
-                  variant={selectedStatus === 'all' ? 'default' : 'outline'}
+                  key={key}
+                  variant={selectedStatus === key ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedStatus('all')}
+                  onClick={() => setSelectedStatus(key)}
                 >
-                  Tumu
+                  {label}
                 </Button>
-                {Object.entries(statusLabels).map(([key, { label }]) => (
-                  <Button
-                    key={key}
-                    variant={selectedStatus === key ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedStatus(key)}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </CardContent>
@@ -368,18 +370,18 @@ export default function PurchaseInvoicesPage() {
 
       {/* Invoices Table */}
       <Card>
-        <CardContent className="pt-6">
-          <Table>
+        <CardContent className="pt-6 overflow-x-auto">
+          <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Fatura No</TableHead>
                 <TableHead>Tarih</TableHead>
                 <TableHead>Tedarikci</TableHead>
-                <TableHead>Sube</TableHead>
-                <TableHead className="text-right">Ara Toplam</TableHead>
-                <TableHead className="text-right">KDV</TableHead>
+                <TableHead className="hidden lg:table-cell">Sube</TableHead>
+                <TableHead className="text-right hidden md:table-cell">Ara Toplam</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">KDV</TableHead>
                 <TableHead className="text-right">Toplam</TableHead>
-                <TableHead>Durum</TableHead>
+                <TableHead className="hidden sm:table-cell">Durum</TableHead>
                 <TableHead>Odeme</TableHead>
                 <TableHead className="w-[100px]">Islem</TableHead>
               </TableRow>
@@ -403,21 +405,21 @@ export default function PurchaseInvoicesPage() {
                     </TableCell>
                     <TableCell>{formatDate(invoice.date || invoice.invoice_date || invoice.createdAt || new Date())}</TableCell>
                     <TableCell>{invoice.supplier || invoice.supplier_name || '-'}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <span className="text-xs text-muted-foreground">
                         {getBranchName(invoice.branchId || invoice.branch_id)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono hidden md:table-cell">
                       {formatCurrency(invoice.subtotal || 0)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">
+                    <TableCell className="text-right font-mono text-muted-foreground hidden sm:table-cell">
                       {formatCurrency(invoice.vatAmount || invoice.total_tax || 0)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
                       {formatCurrency(invoice.total || invoice.grand_total || 0)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                           statusLabels[invoice.status || 'pending']?.color || 'bg-gray-100'

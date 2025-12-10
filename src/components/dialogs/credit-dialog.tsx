@@ -771,8 +771,8 @@ export function CreditPaymentDialog({ open, onOpenChange, credit, bankAccounts }
                 <SelectValue placeholder="Hesap secin" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Manuel odeme</SelectItem>
-                {bankAccounts.filter(a => a.isActive !== false).map((acc) => (
+                <SelectItem value="manual">Manuel odeme</SelectItem>
+                {bankAccounts.filter(a => a.id && a.isActive !== false).map((acc) => (
                   <SelectItem key={acc.id} value={acc.id}>
                     {acc.name} - {acc.bankName} ({acc.currency} {(acc.balance || 0).toLocaleString()})
                   </SelectItem>

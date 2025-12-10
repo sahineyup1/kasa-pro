@@ -24,7 +24,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { addFirestoreData, updateFirestoreData } from '@/services/firebase';
+import { pushData, updateData } from '@/services/firebase';
 import { Loader2 } from 'lucide-react';
 
 // Roles
@@ -131,7 +131,8 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSave }: Employe
   // Employment info
   const [role, setRole] = useState('kasiyer');
   const [branch, setBranch] = useState('');
-  const [salary, setSalary] = useState('');
+  const [bankSalary, setBankSalary] = useState('');
+  const [cashSalary, setCashSalary] = useState('');
   const [status, setStatus] = useState('active');
   const [startDate, setStartDate] = useState('');
 
@@ -153,27 +154,42 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSave }: Employe
       const today = new Date().toISOString().split('T')[0];
 
       if (employee) {
-        // Edit mode - load existing data
-        setFirstName(getField(employee, ['personal', 'firstName'], 'firstName', ''));
-        setLastName(getField(employee, ['personal', 'lastName'], 'lastName', ''));
-        setPhone(getField(employee, ['personal', 'phone'], 'phone', ''));
-        setEmail(getField(employee, ['personal', 'email'], 'email', ''));
-        setAddress(getField(employee, ['personal', 'address'], 'address', ''));
-        setDateOfBirth(getField(employee, ['personal', 'dateOfBirth'], 'dateOfBirth', ''));
-        setNationality(getField(employee, ['personal', 'nationality'], 'nationality', ''));
+        // Edit mode - load existing data (support both Python RTDB and web structures)
+        const emp = employee as any;
 
-        setRole(getField(employee, ['employment', 'role'], 'role', 'kasiyer'));
-        setBranch(getField(employee, ['employment', 'branch'], 'branch', ''));
-        setSalary(String(getField(employee, ['employment', 'salary'], 'salary', '') || ''));
-        setStatus(getField(employee, ['employment', 'status'], 'status', 'active'));
-        setStartDate(getField(employee, ['employment', 'startDate'], 'startDate', ''));
+        // Personal info - Python uses personal_info, web uses personal
+        const personalInfo = emp.personal_info || emp.personal || {};
+        const fullName = personalInfo.full_name || '';
+        const nameParts = fullName.split(' ');
+        setFirstName(personalInfo.first_name || personalInfo.firstName || nameParts[0] || emp.firstName || '');
+        setLastName(personalInfo.last_name || personalInfo.lastName || nameParts.slice(1).join(' ') || emp.lastName || '');
+        setPhone(personalInfo.phone || emp.phone || '');
+        setEmail(personalInfo.email || emp.email || '');
+        setAddress(personalInfo.address || emp.address || '');
+        setDateOfBirth(personalInfo.birth_date || personalInfo.dateOfBirth || emp.dateOfBirth || '');
+        setNationality(personalInfo.nationality || emp.nationality || '');
 
-        setVisaExpiry(getField(employee, ['documents', 'visaExpiry'], 'visaExpiry', ''));
-        setWorkPermitExpiry(getField(employee, ['documents', 'workPermitExpiry'], 'workPermitExpiry', ''));
-        setNationalId(getField(employee, ['documents', 'nationalId'], 'nationalId', ''));
-        setTaxNumber(getField(employee, ['documents', 'taxNumber'], 'taxNumber', ''));
+        // Employment info - Python uses employment_info, web uses employment
+        const employmentInfo = emp.employment_info || emp.employment || {};
+        setRole(employmentInfo.role || emp.role || 'kasiyer');
+        setBranch(employmentInfo.branch || emp.branch || '');
+        const salaryInfo = emp.salary_info || {};
+        setBankSalary(String(salaryInfo.monthly_salary || employmentInfo.salary || emp.salary || '') || '');
+        setCashSalary(String(salaryInfo.cash_salary || emp.cashSalary || '') || '');
+        setStatus(emp.status || employmentInfo.status || 'active');
+        setStartDate(employmentInfo.start_date || employmentInfo.startDate || emp.startDate || '');
 
-        setNotes(getField(employee, [], 'notes', ''));
+        // Documents - Python uses visa_info, web uses documents
+        const visaInfo = emp.visa_info || emp.documents || {};
+        const visaDate = visaInfo.visa_expiry_date || visaInfo.visaExpiry || emp.visaExpiry || '';
+        setVisaExpiry(visaDate === '9999-12-31' ? '' : visaDate);
+        setWorkPermitExpiry(visaInfo.work_permit_expiry || visaInfo.workPermitExpiry || emp.workPermitExpiry || '');
+        setNationalId(String(personalInfo.tc_no || visaInfo.nationalId || emp.nationalId || ''));
+        setTaxNumber(String(visaInfo.taxNumber || emp.taxNumber || ''));
+
+        // Notes
+        const notesVal = emp.notes;
+        setNotes(typeof notesVal === 'string' ? notesVal : '');
       } else {
         // New employee - reset form
         setFirstName('');
@@ -185,7 +201,8 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSave }: Employe
         setNationality('');
         setRole('kasiyer');
         setBranch('');
-        setSalary('');
+        setBankSalary('');
+        setCashSalary('');
         setStatus('active');
         setStartDate(today);
         setVisaExpiry('');
@@ -216,37 +233,51 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSave }: Employe
 
     setSaving(true);
     try {
+      // Save in Python RTDB structure for compatibility
       const employeeData = {
-        personal: {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+        // Python structure: personal_info
+        personal_info: {
+          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
           phone: phone.trim(),
           email: email.trim(),
           address: address.trim(),
-          dateOfBirth,
+          birth_date: dateOfBirth,
           nationality: nationality.trim(),
         },
-        employment: {
+        // Python structure: employment_info
+        employment_info: {
           role,
           branch,
-          salary: parseFloat(salary) || 0,
+          position: role, // Same as role for now
+          start_date: startDate,
           status,
-          startDate,
         },
-        documents: {
-          visaExpiry: visaExpiry || null,
-          workPermitExpiry: workPermitExpiry || null,
-          nationalId: nationalId.trim(),
-          taxNumber: taxNumber.trim(),
+        // Python structure: salary_info
+        salary_info: {
+          monthly_salary: parseFloat(bankSalary) || 0,
+          cash_salary: parseFloat(cashSalary) || 0,
+          sgk_included: true,
         },
-        notes: notes.trim(),
+        // Python structure: visa_info
+        visa_info: {
+          visa_expiry_date: visaExpiry || '9999-12-31',
+          work_permit_expiry: workPermitExpiry || null,
+          residence_type: visaExpiry ? 'Yıllık Vize' : 'Sürekli Vatandaş',
+        },
+        // Top level status
+        status,
+        notes: (notes || '').toString().trim(),
         updatedAt: new Date().toISOString(),
       };
 
       if (isEditMode && employee?.id) {
-        await updateFirestoreData('employees', employee.id, employeeData);
+        // Update in RTDB (erp/employees/{id})
+        await updateData(`employees/${employee.id}`, employeeData);
       } else {
-        await addFirestoreData('employees', {
+        // Add new employee to RTDB (erp/employees)
+        await pushData('employees', {
           ...employeeData,
           createdAt: new Date().toISOString(),
         });
@@ -398,33 +429,79 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSave }: Employe
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="salary">Maas (EUR)</Label>
-                  <Input
-                    id="salary"
-                    type="number"
-                    step="0.01"
-                    value={salary}
-                    onChange={(e) => setSalary(e.target.value)}
-                    placeholder="0.00"
-                  />
+              {/* Salary Section */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                <h4 className="font-medium text-gray-700 flex items-center gap-2">
+                  Maas Bilgileri
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bankSalary" className="flex items-center gap-2">
+                      <span className="text-blue-600">Resmi Maas (Banka)</span>
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>
+                      <Input
+                        id="bankSalary"
+                        type="number"
+                        step="0.01"
+                        value={bankSalary}
+                        onChange={(e) => setBankSalary(e.target.value)}
+                        placeholder="0.00"
+                        className="pl-8"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">SGK/vergi dahil resmi bordro maasi</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cashSalary" className="flex items-center gap-2">
+                      <span className="text-green-600">Elden Maas (Nakit)</span>
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>
+                      <Input
+                        id="cashSalary"
+                        type="number"
+                        step="0.01"
+                        value={cashSalary}
+                        onChange={(e) => setCashSalary(e.target.value)}
+                        placeholder="0.00"
+                        className="pl-8"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">Kayit disi elden odenen tutar</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Durum</Label>
-                  <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Durum secin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUSES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {(parseFloat(bankSalary) > 0 || parseFloat(cashSalary) > 0) && (
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-sm text-gray-600">Toplam Maas:</span>
+                    <span className="font-semibold text-lg">
+                      €{((parseFloat(bankSalary) || 0) + (parseFloat(cashSalary) || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {parseFloat(cashSalary) > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded p-2 text-sm text-amber-700">
+                    Elden maas tanimli. Bu personelin elden odemesi "Toplu Maas Ode" ile yapilmaz,
+                    personel listesinden sag tik → "Elden Maas Ode" ile manuel odenir.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Durum</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Durum secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

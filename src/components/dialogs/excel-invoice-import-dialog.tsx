@@ -391,14 +391,15 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
 
   // Update item product match
   const updateItemMatch = (itemId: string, productId: string) => {
-    const product = products.find(p => p.id === productId);
+    const actualProductId = productId === 'none' ? '' : productId;
+    const product = products.find(p => p.id === actualProductId);
     const updatedItems = parsedItems.map(item => {
       if (item.id !== itemId) return item;
       return {
         ...item,
-        matchedProductId: productId || undefined,
+        matchedProductId: actualProductId || undefined,
         matchedProductName: product?.name || '',
-        matchStatus: productId ? 'matched' as const : 'unmatched' as const,
+        matchStatus: actualProductId ? 'matched' as const : 'unmatched' as const,
       };
     });
     setParsedItems(updatedItems);
@@ -533,7 +534,7 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
                         <SelectValue placeholder="Tedarikci secin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {suppliers.map((s) => (
+                        {suppliers.filter(s => s.id).map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.name}
                           </SelectItem>
@@ -550,7 +551,7 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
                         <SelectValue placeholder="Sube secin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {branches.filter(b => b.isActive !== false).map((branch) => (
+                        {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
                           <SelectItem key={branch.id} value={branch.id}>
                             {branch.name}
                           </SelectItem>
@@ -731,15 +732,15 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
                           <TableCell className="text-right font-mono font-medium">{item.lineTotal.toFixed(2)}</TableCell>
                           <TableCell>
                             <Select
-                              value={item.matchedProductId || ''}
-                              onValueChange={(value) => updateItemMatch(item.id, value)}
+                              value={item.matchedProductId || 'none'}
+                              onValueChange={(value) => updateItemMatch(item.id, value === 'none' ? '' : value)}
                             >
                               <SelectTrigger className="h-8 text-xs">
                                 <SelectValue placeholder="Urun sec..." />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">-- Secim yok --</SelectItem>
-                                {products.map((p) => (
+                                <SelectItem value="none">-- Secim yok --</SelectItem>
+                                {products.filter(p => p.id).map((p) => (
                                   <SelectItem key={p.id} value={p.id}>
                                     {p.name}
                                   </SelectItem>

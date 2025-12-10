@@ -209,7 +209,7 @@ export function MaintenanceDialog({ open, onOpenChange, maintenanceRecord, onSav
                   <SelectValue placeholder="Arac secin" />
                 </SelectTrigger>
                 <SelectContent>
-                  {vehicles.map((v) => (
+                  {vehicles.filter(v => v.id).map((v) => (
                     <SelectItem key={v.id} value={v.id}>{v.plate}</SelectItem>
                   ))}
                 </SelectContent>

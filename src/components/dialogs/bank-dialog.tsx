@@ -410,7 +410,7 @@ export function BankTransactionDialog({
                 <SelectValue placeholder="Hesap secin" />
               </SelectTrigger>
               <SelectContent>
-                {accounts.filter(a => a.isActive !== false).map((acc) => (
+                {accounts.filter(a => a.id && a.isActive !== false).map((acc) => (
                   <SelectItem key={acc.id} value={acc.id}>
                     {acc.name} - {acc.bankName} ({acc.currency} {(acc.balance || 0).toLocaleString()})
                   </SelectItem>
@@ -431,7 +431,7 @@ export function BankTransactionDialog({
                     <SelectValue placeholder="Hedef hesap secin" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.filter(a => a.isActive !== false && a.id !== formData.accountId).map((acc) => (
+                    {accounts.filter(a => a.id && a.isActive !== false && a.id !== formData.accountId).map((acc) => (
                       <SelectItem key={acc.id} value={acc.id}>
                         {acc.name} - {acc.bankName}
                       </SelectItem>

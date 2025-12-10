@@ -121,14 +121,15 @@ export function SaleInvoiceDialog({
             <div className="space-y-2">
               <Label>Sube</Label>
               <Select
-                value={formData.branchId || ''}
-                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                value={formData.branchId || 'none'}
+                onValueChange={(value) => setFormData({ ...formData, branchId: value === 'none' ? '' : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sube secin" />
                 </SelectTrigger>
                 <SelectContent>
-                  {branches.map((branch) => (
+                  <SelectItem value="none">-- Sube secin --</SelectItem>
+                  {branches.filter(b => b.id).map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name || branch.id}
                     </SelectItem>

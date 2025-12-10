@@ -366,7 +366,7 @@ export function BulkTransferDialog({ open, onOpenChange, selectedItems, onSucces
                   <SelectValue placeholder="Surucu sec..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map(e => (
+                  {employees.filter(e => e.id).map(e => (
                     <SelectItem key={e.id} value={e.id}>
                       {e.firstName} {e.lastName}
                     </SelectItem>

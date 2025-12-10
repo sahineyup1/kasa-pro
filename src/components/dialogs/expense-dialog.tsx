@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { addFirestoreData, updateFirestoreData, subscribeToFirestore } from '@/services/firebase';
+import { addFirestoreData, updateFirestoreData, subscribeToFirestore, subscribeToData } from '@/services/firebase';
 
 // DDV Oranları (Slovenya)
 const DDV_RATES = [
@@ -74,6 +74,20 @@ interface ExpenseVendor {
   taxNumber?: string;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+  surname?: string;
+  fullName?: string;
+}
+
+interface Vehicle {
+  id: string;
+  plate: string;
+  brand?: string;
+  model?: string;
+}
+
 interface ExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -100,10 +114,14 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [vehicleId, setVehicleId] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Vendors from Firebase
+  // Data from Firebase
   const [vendors, setVendors] = useState<ExpenseVendor[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   // Load vendors from Firestore
   useEffect(() => {
@@ -121,6 +139,61 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
     });
     return () => unsubscribe();
   }, []);
+
+  // Load employees from RTDB (same as Python desktop app: erp/employees)
+  useEffect(() => {
+    if (!open) return; // Only load when dialog opens
+
+    console.log('ExpenseDialog: Loading employees from RTDB...');
+    const unsubscribe = subscribeToData('employees', (data) => {
+      console.log('ExpenseDialog: Employees data received:', data ? Object.keys(data).length : 0);
+      if (data) {
+        const list = Object.entries(data).map(([id, e]: [string, any]) => {
+          // Python structure: personal_info.full_name
+          const personalInfo = e.personal_info || {};
+          const fullName = personalInfo.full_name || '';
+          const firstName = personalInfo.first_name || e.firstName || e.name || '';
+          const lastName = personalInfo.last_name || e.lastName || e.surname || '';
+          return {
+            id,
+            name: firstName,
+            surname: lastName,
+            fullName: fullName || `${firstName} ${lastName}`.trim(),
+          };
+        }).filter((e: Employee) => e.name || e.fullName);
+        list.sort((a: Employee, b: Employee) => (a.fullName || a.name).localeCompare(b.fullName || b.name));
+        setEmployees(list);
+        console.log('ExpenseDialog: Employees loaded:', list.length, list.map(e => e.fullName));
+      } else {
+        console.log('ExpenseDialog: No employees data in RTDB');
+      }
+    });
+    return () => unsubscribe();
+  }, [open]);
+
+  // Load vehicles from RTDB (same as Python desktop app: erp/vehicles)
+  useEffect(() => {
+    if (!open) return; // Only load when dialog opens
+
+    console.log('ExpenseDialog: Loading vehicles from RTDB...');
+    const unsubscribe = subscribeToData('vehicles', (data) => {
+      console.log('ExpenseDialog: Vehicles data received:', data ? Object.keys(data).length : 0);
+      if (data) {
+        const list = Object.entries(data).map(([id, v]: [string, any]) => ({
+          id,
+          plate: v.plate || '',
+          brand: v.brand || '',
+          model: v.model || '',
+        })).filter((v: Vehicle) => v.plate);
+        list.sort((a: Vehicle, b: Vehicle) => a.plate.localeCompare(b.plate));
+        setVehicles(list);
+        console.log('ExpenseDialog: Vehicles loaded:', list.length, list.map(v => v.plate));
+      } else {
+        console.log('ExpenseDialog: No vehicles data in RTDB');
+      }
+    });
+    return () => unsubscribe();
+  }, [open]);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -142,6 +215,8 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         setPaymentMethod(expense.paymentMethod || 'cash');
         setDueDate(expense.dueDate || '');
         setNotes(expense.notes || '');
+        setEmployeeId(expense.employeeId || '');
+        setVehicleId(expense.vehicleId || '');
       } else {
         // New expense - reset form
         const today = new Date().toISOString().split('T')[0];
@@ -160,6 +235,8 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         setPaymentMethod('cash');
         setDueDate('');
         setNotes('');
+        setEmployeeId('');
+        setVehicleId('');
       }
     }
   }, [open, expense]);
@@ -216,6 +293,8 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
     setSaving(true);
     try {
       const vendor = vendors.find(v => v.id === vendorId);
+      const employee = employees.find(e => e.id === employeeId);
+      const vehicle = vehicles.find(v => v.id === vehicleId);
 
       const expenseData = {
         // Invoice info
@@ -230,12 +309,20 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         description: description.trim(),
 
         // Vendor info
-        vendorId: vendorId || null,
+        vendorId: vendorId && vendorId !== 'none' ? vendorId : null,
         vendorName: vendor?.name || '',
         vendor: vendor?.name || '',
-        supplierId: vendorId || null,
+        supplierId: vendorId && vendorId !== 'none' ? vendorId : null,
         supplierName: vendor?.name || '',
         supplierDdvNo: supplierDdvNo.trim(),
+
+        // Employee info
+        employeeId: employeeId && employeeId !== 'none' ? employeeId : null,
+        employeeName: employee?.fullName || employee?.name || '',
+
+        // Vehicle info
+        vehicleId: vehicleId && vehicleId !== 'none' ? vehicleId : null,
+        vehiclePlate: vehicle?.plate || '',
 
         // Amounts
         netAmount: parseFloat(netAmount) || 0,
@@ -369,8 +456,8 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
                     <SelectValue placeholder="- Cari Secin -" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">- Cari Secin -</SelectItem>
-                    {vendors.map((vendor) => (
+                    <SelectItem value="none">- Cari Secin -</SelectItem>
+                    {vendors.filter(v => v.id).map((vendor) => (
                       <SelectItem key={vendor.id} value={vendor.id}>
                         {vendor.name}
                       </SelectItem>
@@ -386,6 +473,47 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
                   onChange={(e) => setSupplierDdvNo(e.target.value)}
                   placeholder="SI12345678"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Calisan ve Arac */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">
+              Calisan ve Arac
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="employee">Calisan</Label>
+                <Select value={employeeId} onValueChange={setEmployeeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="- Calisan Secin -" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">- Calisan Secin -</SelectItem>
+                    {employees.filter(e => e.id).map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.fullName || emp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle">Arac</Label>
+                <Select value={vehicleId} onValueChange={setVehicleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="- Arac Secin -" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">- Arac Secin -</SelectItem>
+                    {vehicles.filter(v => v.id).map((veh) => (
+                      <SelectItem key={veh.id} value={veh.id}>
+                        {veh.plate} {veh.brand && veh.model ? `(${veh.brand} ${veh.model})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

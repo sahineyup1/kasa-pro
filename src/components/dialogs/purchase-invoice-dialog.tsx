@@ -320,7 +320,7 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
                     <SelectValue placeholder="Sube secin" />
                   </SelectTrigger>
                   <SelectContent>
-                    {branches.filter(b => b.isActive !== false).map((branch) => (
+                    {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
                         {branch.name}
                       </SelectItem>
@@ -384,7 +384,7 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
                     <SelectValue placeholder="Tedarikci secin" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((s) => (
+                    {suppliers.filter(s => s.id).map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
