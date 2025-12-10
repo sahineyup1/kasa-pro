@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard/layout,_N_T_/dashboard/purchase-invoices/layout,_N_T_/dashboard/purchase-invoices/page,_N_T_/dashboard/purchase-invoices"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard/purchase-invoices/__PAGE__",
+    "/dashboard/purchase-invoices",
+    "/dashboard",
+    "/_index",
+    "/_head"
+  ]
+}

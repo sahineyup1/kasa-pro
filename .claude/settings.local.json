@@ -12,7 +12,9 @@
       "Bash(timeout /t 2 /nobreak)",
       "Bash(find:*)",
       "Bash(npx tsc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

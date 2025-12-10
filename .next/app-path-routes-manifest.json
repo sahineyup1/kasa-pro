@@ -1,0 +1,20 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/dashboard/customers/page": "/dashboard/customers",
+  "/dashboard/employees/page": "/dashboard/employees",
+  "/dashboard/expenses/page": "/dashboard/expenses",
+  "/dashboard/finance/page": "/dashboard/finance",
+  "/dashboard/invoices/page": "/dashboard/invoices",
+  "/dashboard/logistics/page": "/dashboard/logistics",
+  "/dashboard/page": "/dashboard",
+  "/dashboard/products/page": "/dashboard/products",
+  "/dashboard/purchase-invoices/page": "/dashboard/purchase-invoices",
+  "/dashboard/reports/page": "/dashboard/reports",
+  "/dashboard/settings/page": "/dashboard/settings",
+  "/dashboard/suppliers/page": "/dashboard/suppliers",
+  "/dashboard/vehicles/page": "/dashboard/vehicles",
+  "/dashboard/warehouse/page": "/dashboard/warehouse",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/"
+}

@@ -1,0 +1,20 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/dashboard/customers/page": "app/dashboard/customers/page.js",
+  "/dashboard/employees/page": "app/dashboard/employees/page.js",
+  "/dashboard/expenses/page": "app/dashboard/expenses/page.js",
+  "/dashboard/finance/page": "app/dashboard/finance/page.js",
+  "/dashboard/invoices/page": "app/dashboard/invoices/page.js",
+  "/dashboard/logistics/page": "app/dashboard/logistics/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/products/page": "app/dashboard/products/page.js",
+  "/dashboard/purchase-invoices/page": "app/dashboard/purchase-invoices/page.js",
+  "/dashboard/reports/page": "app/dashboard/reports/page.js",
+  "/dashboard/settings/page": "app/dashboard/settings/page.js",
+  "/dashboard/suppliers/page": "app/dashboard/suppliers/page.js",
+  "/dashboard/vehicles/page": "app/dashboard/vehicles/page.js",
+  "/dashboard/warehouse/page": "app/dashboard/warehouse/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js"
+}
