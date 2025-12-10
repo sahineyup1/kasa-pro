@@ -5,7 +5,13 @@ import { Plus, Trash2, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -201,7 +207,7 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
     try {
       const supplier = suppliers.find(s => s.id === supplierId);
 
-      const invoiceData = {
+      const invoiceData: Record<string, any> = {
         invoiceNo: invoiceNo.trim(),
         date: invoiceDate,
         dueDate: dueDate || null,
@@ -288,14 +294,15 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Durum</Label>
-                <Select
-                  id="status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Durum secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -309,15 +316,15 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="supplier">Tedarikci</Label>
-                <Select
-                  id="supplier"
-                  value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                >
-                  <option value="">- Tedarikci Secin -</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                <Select value={supplierId} onValueChange={setSupplierId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tedarikci secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
@@ -331,14 +338,15 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
               </div>
               <div className="space-y-2">
                 <Label htmlFor="paymentStatus">Odeme Durumu</Label>
-                <Select
-                  id="paymentStatus"
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                >
-                  {PAYMENT_STATUSES.map((ps) => (
-                    <option key={ps.value} value={ps.value}>{ps.label}</option>
-                  ))}
+                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Odeme durumu secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_STATUSES.map((ps) => (
+                      <SelectItem key={ps.value} value={ps.value}>{ps.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -398,11 +406,16 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
                   <div className="col-span-2">
                     <Select
                       value={String(item.ddvRate)}
-                      onChange={(e) => updateItem(item.id, 'ddvRate', parseFloat(e.target.value))}
+                      onValueChange={(value) => updateItem(item.id, 'ddvRate', parseFloat(value))}
                     >
-                      {DDV_RATES.map((rate) => (
-                        <option key={rate.value} value={rate.value}>{rate.label}</option>
-                      ))}
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DDV_RATES.map((rate) => (
+                          <SelectItem key={rate.value} value={String(rate.value)}>{rate.label}</SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                   </div>
                   <div className="col-span-2 text-right font-mono font-semibold">

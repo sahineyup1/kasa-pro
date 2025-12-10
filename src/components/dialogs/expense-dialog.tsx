@@ -5,7 +5,13 @@ import { X, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -14,7 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { pushData, updateData, subscribeToData } from '@/services/firebase';
+import { addFirestoreData, updateFirestoreData, subscribeToFirestore } from '@/services/firebase';
 
 // DDV Oranları (Slovenya)
 const DDV_RATES = [
@@ -99,17 +105,17 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
   // Vendors from Firebase
   const [vendors, setVendors] = useState<ExpenseVendor[]>([]);
 
-  // Load vendors
+  // Load vendors from Firestore
   useEffect(() => {
-    const unsubscribe = subscribeToData('expense_vendors', (data) => {
-      if (data) {
-        const vendorList = Object.entries(data).map(([id, v]: [string, any]) => ({
-          id,
+    const unsubscribe = subscribeToFirestore('expense_vendors', (data) => {
+      if (data && data.length > 0) {
+        const vendorList = data.map((v: any) => ({
+          id: v.id,
           name: v.name || '',
           category: v.category,
           taxNumber: v.taxNumber || v.ddvNumber,
-        })).filter(v => v.name);
-        vendorList.sort((a, b) => a.name.localeCompare(b.name));
+        })).filter((v: ExpenseVendor) => v.name);
+        vendorList.sort((a: ExpenseVendor, b: ExpenseVendor) => a.name.localeCompare(b.name));
         setVendors(vendorList);
       }
     });
@@ -258,13 +264,16 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
       };
 
       if (isEditMode && expense?.id) {
-        // Update existing
-        await updateData(`expenses/${expense.id}`, expenseData);
+        // Update existing in Firestore
+        await updateFirestoreData('expenses', expense.id, expenseData);
       } else {
-        // Create new
-        expenseData.createdAt = new Date().toISOString();
-        expenseData.date = invoiceDate;
-        await pushData('expenses', expenseData);
+        // Create new in Firestore
+        const newExpenseData = {
+          ...expenseData,
+          date: invoiceDate,
+          isActive: true,
+        };
+        await addFirestoreData('expenses', newExpenseData);
       }
 
       onOpenChange(false);
@@ -304,16 +313,17 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Kategori *</Label>
-                <Select
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kategori seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
@@ -354,17 +364,18 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="vendor">Masraf Carisi</Label>
-                <Select
-                  id="vendor"
-                  value={vendorId}
-                  onChange={(e) => setVendorId(e.target.value)}
-                >
-                  <option value="">- Cari Secin -</option>
-                  {vendors.map((vendor) => (
-                    <option key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </option>
-                  ))}
+                <Select value={vendorId} onValueChange={setVendorId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="- Cari Secin -" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">- Cari Secin -</SelectItem>
+                    {vendors.map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        {vendor.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
@@ -418,16 +429,17 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="ddvRate">DDV Orani</Label>
-                <Select
-                  id="ddvRate"
-                  value={ddvRate}
-                  onChange={(e) => setDdvRate(e.target.value)}
-                >
-                  {DDV_RATES.map((rate) => (
-                    <option key={rate.value} value={rate.value}>
-                      {rate.label}
-                    </option>
-                  ))}
+                <Select value={ddvRate} onValueChange={setDdvRate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="DDV Oranı seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DDV_RATES.map((rate) => (
+                      <SelectItem key={rate.value} value={String(rate.value)}>
+                        {rate.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
@@ -481,32 +493,34 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="paymentStatus">Odeme Durumu *</Label>
-                <Select
-                  id="paymentStatus"
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                >
-                  {PAYMENT_STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
+                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ödeme durumu seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_STATUSES.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
 
               {paymentStatus === 'paid' && (
                 <div className="space-y-2">
                   <Label htmlFor="paymentMethod">Odeme Yontemi *</Label>
-                  <Select
-                    id="paymentMethod"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                  >
-                    {PAYMENT_METHODS.map((method) => (
-                      <option key={method.value} value={method.value}>
-                        {method.label}
-                      </option>
-                    ))}
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ödeme yöntemi seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((method) => (
+                        <SelectItem key={method.value} value={method.value}>
+                          {method.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
               )}

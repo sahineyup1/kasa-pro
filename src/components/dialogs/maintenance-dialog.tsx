@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -146,7 +152,7 @@ export function MaintenanceDialog({ open, onOpenChange, maintenanceRecord, onSav
       const vehicle = vehicles.find(v => v.id === vehicleId);
       const typeLabel = MAINTENANCE_TYPES.find(t => t.value === type)?.label || type;
 
-      const maintenanceData = {
+      const maintenanceData: Record<string, any> = {
         vehicleId,
         vehiclePlate: vehicle?.plate || '',
         date,
@@ -198,15 +204,15 @@ export function MaintenanceDialog({ open, onOpenChange, maintenanceRecord, onSav
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle">Arac *</Label>
-              <Select
-                id="vehicle"
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-              >
-                <option value="">- Arac Secin -</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>{v.plate}</option>
-                ))}
+              <Select value={vehicleId} onValueChange={setVehicleId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Arac secin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.plate}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
@@ -223,14 +229,15 @@ export function MaintenanceDialog({ open, onOpenChange, maintenanceRecord, onSav
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="type">Bakim Tipi *</Label>
-              <Select
-                id="type"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                {MAINTENANCE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Bakim tipi secin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MAINTENANCE_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">

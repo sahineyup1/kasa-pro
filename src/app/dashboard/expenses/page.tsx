@@ -26,23 +26,36 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { getData, subscribeToData, removeData } from '@/services/firebase';
+import { subscribeToFirestore, deleteFirestoreData } from '@/services/firebase';
 import { ExpenseDialog } from '@/components/dialogs/expense-dialog';
 
 interface Expense {
   id: string;
-  date: string;
-  vendor: string;
+  _id?: string;
+  documentNumber?: string;
+  documentDate?: string;
+  date?: string;
+  vendor?: string;
   vendorId?: string;
+  vendorName?: string;
   category: string;
-  description: string;
-  amount: number;
-  vatAmount: number;
-  totalAmount: number;
-  paymentMethod: string;
-  status: string;
-  createdAt: string;
-  createdBy: string;
+  categoryName?: string;
+  description?: string;
+  notes?: string;
+  amount?: number;
+  netAmount?: number;
+  vatAmount?: number;
+  ddvAmount?: number;
+  totalAmount?: number;
+  grossAmount?: number;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  status?: string;
+  branchId?: string;
+  branchName?: string;
+  createdAt?: any;
+  createdBy?: string;
+  isActive?: boolean;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -71,29 +84,37 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   useEffect(() => {
-    // Firebase'den masraf fişlerini dinle
-    const unsubscribe = subscribeToData('expenses', (data) => {
-      if (data) {
-        const expenseList = Object.entries(data).map(([id, expense]: [string, any]) => ({
-          id,
-          ...expense,
-        }));
-        // Tarihe göre sırala (en yeni önce)
-        expenseList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setExpenses(expenseList);
-      } else {
-        setExpenses([]);
+    // Firestore'dan masraf fişlerini dinle (erp_expenses collection)
+    const unsubscribe = subscribeToFirestore(
+      'expenses',
+      (data) => {
+        // Aktif kayıtları filtrele ve tarihe göre sırala
+        const activeExpenses = data
+          .filter((e: Expense) => e.isActive !== false)
+          .sort((a: Expense, b: Expense) => {
+            const dateA = a.documentDate || a.date || '';
+            const dateB = b.documentDate || b.date || '';
+            return dateB.localeCompare(dateA);
+          });
+        setExpenses(activeExpenses);
+        setLoading(false);
+      },
+      {
+        whereField: 'isActive',
+        whereOp: '==',
+        whereValue: true,
       }
-      setLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, []);
 
   const filteredExpenses = expenses.filter((expense) => {
+    const vendorText = expense.vendorName || expense.vendor || '';
+    const descText = expense.description || expense.notes || '';
     const matchesSearch =
-      expense.vendor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      expense.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      vendorText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      descText.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory =
       selectedCategory === 'all' || expense.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -101,10 +122,12 @@ export default function ExpensesPage() {
 
   const stats = {
     total: expenses.length,
-    totalAmount: expenses.reduce((sum, e) => sum + (e.totalAmount || 0), 0),
-    pending: expenses.filter((e) => e.status === 'pending').length,
+    totalAmount: expenses.reduce((sum, e) => sum + (e.grossAmount || e.totalAmount || 0), 0),
+    pending: expenses.filter((e) => (e.paymentStatus || e.status) === 'pending').length,
     thisMonth: expenses.filter((e) => {
-      const expenseDate = new Date(e.date);
+      const dateStr = e.documentDate || e.date || '';
+      if (!dateStr) return false;
+      const expenseDate = new Date(dateStr);
       const now = new Date();
       return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
     }).length,
@@ -121,9 +144,10 @@ export default function ExpensesPage() {
   };
 
   const handleDeleteExpense = async (expense: Expense) => {
-    if (confirm(`"${expense.description || expense.vendor}" masrafini silmek istediginize emin misiniz?`)) {
+    const displayName = expense.description || expense.vendorName || expense.vendor || 'Bu masraf';
+    if (confirm(`"${displayName}" masrafini silmek istediginize emin misiniz?`)) {
       try {
-        await removeData(`expenses/${expense.id}`);
+        await deleteFirestoreData('expenses', expense.id);
       } catch (error) {
         console.error('Delete error:', error);
         alert('Silme hatasi: ' + (error as Error).message);
@@ -281,66 +305,75 @@ export default function ExpensesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell className="font-medium">
-                      {formatDate(expense.date)}
-                    </TableCell>
-                    <TableCell>{expense.vendor || '-'}</TableCell>
-                    <TableCell>
-                      {categoryLabels[expense.category] || expense.category}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {expense.description || '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(expense.amount || 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">
-                      {formatCurrency(expense.vatAmount || 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(expense.totalAmount || 0)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          statusLabels[expense.status]?.color || 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {statusLabels[expense.status]?.label || expense.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditExpense(expense)}
+                filteredExpenses.map((expense) => {
+                  const expenseDate = expense.documentDate || expense.date || '';
+                  const vendorDisplay = expense.vendorName || expense.vendor || '-';
+                  const categoryDisplay = expense.categoryName || categoryLabels[expense.category] || expense.category || '-';
+                  const descDisplay = expense.description || expense.notes || '-';
+                  const netAmount = expense.netAmount || expense.amount || 0;
+                  const vatAmount = expense.ddvAmount || expense.vatAmount || 0;
+                  const totalAmount = expense.grossAmount || expense.totalAmount || 0;
+                  const status = expense.paymentStatus || expense.status || 'pending';
+
+                  return (
+                    <TableRow key={expense.id}>
+                      <TableCell className="font-medium">
+                        {formatDate(expenseDate)}
+                      </TableCell>
+                      <TableCell>{vendorDisplay}</TableCell>
+                      <TableCell>{categoryDisplay}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {descDisplay}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(netAmount)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-muted-foreground">
+                        {formatCurrency(vatAmount)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-medium">
+                        {formatCurrency(totalAmount)}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                            statusLabels[status]?.color || 'bg-gray-100 text-gray-700'
+                          }`}
                         >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditExpense(expense)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => handleDeleteExpense(expense)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          {statusLabels[status]?.label || status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditExpense(expense)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditExpense(expense)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => handleDeleteExpense(expense)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

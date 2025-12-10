@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -133,7 +139,7 @@ export function FuelDialog({ open, onOpenChange, fuelRecord, onSave }: FuelDialo
     try {
       const vehicle = vehicles.find(v => v.id === vehicleId);
 
-      const fuelData = {
+      const fuelData: Record<string, any> = {
         vehicleId,
         vehiclePlate: vehicle?.plate || '',
         date,
@@ -183,15 +189,15 @@ export function FuelDialog({ open, onOpenChange, fuelRecord, onSave }: FuelDialo
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle">Arac *</Label>
-              <Select
-                id="vehicle"
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-              >
-                <option value="">- Arac Secin -</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>{v.plate}</option>
-                ))}
+              <Select value={vehicleId} onValueChange={setVehicleId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Arac secin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.plate}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
@@ -267,27 +273,29 @@ export function FuelDialog({ open, onOpenChange, fuelRecord, onSave }: FuelDialo
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fuelType">Yakit Tipi</Label>
-              <Select
-                id="fuelType"
-                value={fuelType}
-                onChange={(e) => setFuelType(e.target.value)}
-              >
-                <option value="diesel">Dizel</option>
-                <option value="gasoline">Benzin</option>
-                <option value="lpg">LPG</option>
-                <option value="electric">Elektrik</option>
+              <Select value={fuelType} onValueChange={setFuelType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Yakit tipi secin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="diesel">Dizel</SelectItem>
+                  <SelectItem value="gasoline">Benzin</SelectItem>
+                  <SelectItem value="lpg">LPG</SelectItem>
+                  <SelectItem value="electric">Elektrik</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="paymentMethod">Odeme</Label>
-              <Select
-                id="paymentMethod"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                <option value="cash">Nakit</option>
-                <option value="card">Kart</option>
-                <option value="company_card">Firma Karti</option>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Odeme yontemi secin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Nakit</SelectItem>
+                  <SelectItem value="card">Kart</SelectItem>
+                  <SelectItem value="company_card">Firma Karti</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>

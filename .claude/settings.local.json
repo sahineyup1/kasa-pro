@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ipconfig:*)",
+      "Bash(findstr:*)",
+      "Bash(npm run dev:*)",
+      "Bash(dir \"C:\\Users\\Sahin\\Desktop\\kasa\" /AD /B)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

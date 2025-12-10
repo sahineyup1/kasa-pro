@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -115,7 +121,7 @@ export function VehicleDialog({ open, onOpenChange, vehicle, onSave }: VehicleDi
 
     setSaving(true);
     try {
-      const vehicleData = {
+      const vehicleData: Record<string, any> = {
         plate: plate.trim().toUpperCase(),
         brand: brand.trim(),
         model: model.trim(),
@@ -176,14 +182,15 @@ export function VehicleDialog({ open, onOpenChange, vehicle, onSave }: VehicleDi
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Durum</Label>
-                <Select
-                  id="status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Durum secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
@@ -227,26 +234,28 @@ export function VehicleDialog({ open, onOpenChange, vehicle, onSave }: VehicleDi
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type">Arac Tipi</Label>
-                <Select
-                  id="type"
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                >
-                  {VEHICLE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
+                <Select value={type} onValueChange={setType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Arac tipi secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VEHICLE_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fuelType">Yakit Tipi</Label>
-                <Select
-                  id="fuelType"
-                  value={fuelType}
-                  onChange={(e) => setFuelType(e.target.value)}
-                >
-                  {FUEL_TYPES.map((f) => (
-                    <option key={f.value} value={f.value}>{f.label}</option>
-                  ))}
+                <Select value={fuelType} onValueChange={setFuelType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Yakit tipi secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FUEL_TYPES.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
