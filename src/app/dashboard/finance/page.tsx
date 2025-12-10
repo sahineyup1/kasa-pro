@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -31,14 +32,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
-import { subscribeToFirestore, deleteFirestoreData, subscribeToRTDB } from '@/services/firebase';
+import { subscribeToFirestore, deleteFirestoreData, subscribeToRTDB, subscribeToBranches } from '@/services/firebase';
 import { toast } from 'sonner';
 import {
   Plus, RefreshCw, MoreHorizontal, Search, Download, FileSpreadsheet,
   Wallet, Building2, CreditCard, TrendingUp, TrendingDown, DollarSign,
   ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2, Calculator,
   ChevronRight, PiggyBank, Landmark, Receipt, FileText, AlertCircle,
-  CheckCircle, Clock, Settings, List, FileDown
+  CheckCircle, Clock, Settings, List, FileDown, Store, MapPin, Lock, Unlock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -131,6 +132,54 @@ interface CreditPayment {
   status?: 'pending' | 'paid' | 'late';
 }
 
+// Branch (Şube) with Treasury
+interface Branch {
+  id: string;
+  name?: string;
+  isActive?: boolean;
+  treasury?: {
+    cashRegister?: {
+      balance?: {
+        openingBalance?: number;
+        currentBalance?: number;
+        expectedBalance?: number;
+        lastUpdate?: string;
+      };
+      audit?: {
+        status?: 'open' | 'closed';
+        openedAt?: string;
+        closedAt?: string;
+        openedBy?: string;
+        closedBy?: string;
+        difference?: number;
+      };
+    };
+    bankAccounts?: Record<string, BranchBankAccount>;
+  };
+}
+
+interface BranchBankAccount {
+  id?: string;
+  bankName?: string;
+  accountName?: string;
+  accountType?: 'checking' | 'savings' | 'foreign' | 'business' | 'credit_line' | 'leasing';
+  iban?: string;
+  accountNumber?: string;
+  currency?: string;
+  isActive?: boolean;
+  balance?: {
+    currentBalance?: number;
+    openingBalance?: number;
+    lastUpdated?: string;
+  };
+  creditLimit?: number;
+  usedAmount?: number;
+  availableCredit?: number;
+  leasingAsset?: string;
+  leasingTotal?: number;
+  leasingRemaining?: number;
+}
+
 // Transaction type badge
 function TransactionTypeBadge({ type }: { type: string }) {
   const styles: Record<string, string> = {
@@ -194,7 +243,13 @@ export default function FinancePage() {
   const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
   const [credits, setCredits] = useState<Credit[]>([]);
   const [creditPayments, setCreditPayments] = useState<CreditPayment[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [branchesLoading, setBranchesLoading] = useState(true);
+
+  // Branch filter - separate for Kasa and Banka
+  const [selectedKasaBranch, setSelectedKasaBranch] = useState<string>('');
+  const [selectedBankaBranch, setSelectedBankaBranch] = useState<string>('');
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -298,6 +353,13 @@ export default function FinancePage() {
       setCreditPayments(data || []);
     });
 
+    // Branches (Şubeler) - company/branches path'inden
+    setBranchesLoading(true);
+    const unsubBranches = subscribeToBranches((data) => {
+      setBranches(data || []);
+      setBranchesLoading(false);
+    });
+
     return () => {
       unsubTransactions();
       unsubBankAccounts();
@@ -306,6 +368,7 @@ export default function FinancePage() {
       unsubKrediler();
       unsubRTDBCredits();
       unsubCreditPayments();
+      unsubBranches();
     };
   }, []);
 
@@ -402,6 +465,38 @@ export default function FinancePage() {
       .filter(r => r.status === 'open')
       .sort((a, b) => new Date(b.openedAt || '').getTime() - new Date(a.openedAt || '').getTime())[0];
   }, [cashRegisters]);
+
+  // Branch stats
+  const branchStats = useMemo(() => {
+    const activeBranches = branches.filter(b => b.isActive !== false);
+    const openCashRegisters = branches.filter(b =>
+      b.treasury?.cashRegister?.audit?.status === 'open'
+    ).length;
+
+    const totalBranchCash = branches.reduce((sum, b) => {
+      return sum + (b.treasury?.cashRegister?.balance?.currentBalance || 0);
+    }, 0);
+
+    const totalBranchBankBalance = branches.reduce((sum, b) => {
+      // Banka hesaplari
+      if (b.treasury?.bankAccounts) {
+        const branchBankTotal = Object.values(b.treasury.bankAccounts).reduce((bankSum: number, acc: any) => {
+          return bankSum + (acc.balance?.currentBalance || 0);
+        }, 0);
+        return sum + branchBankTotal;
+      }
+      return sum;
+    }, 0);
+
+    return {
+      totalBranches: branches.length,
+      activeBranches: activeBranches.length,
+      openCashRegisters,
+      closedCashRegisters: activeBranches.length - openCashRegisters,
+      totalBranchCash,
+      totalBranchBankBalance,
+    };
+  }, [branches]);
 
   const handleRefresh = () => {
     setLoading(true);
@@ -612,10 +707,14 @@ export default function FinancePage() {
       {/* Content */}
       <div className="flex-1 overflow-auto p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-7 mb-6">
             <TabsTrigger value="dashboard">
               <TrendingUp className="h-4 w-4 mr-2" />
               Hazine Ozeti
+            </TabsTrigger>
+            <TabsTrigger value="branches">
+              <Store className="h-4 w-4 mr-2" />
+              Sube Kasalari
             </TabsTrigger>
             <TabsTrigger value="cash">
               <Wallet className="h-4 w-4 mr-2" />
@@ -821,256 +920,546 @@ export default function FinancePage() {
             </div>
           </TabsContent>
 
-          {/* ==================== KASA TAB ==================== */}
-          <TabsContent value="cash">
-            {/* Cash Status Card */}
-            <div className="bg-white rounded-lg border mb-6">
-              <div className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-4 rounded-full ${currentCashRegister ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Wallet className={`h-8 w-8 ${currentCashRegister ? 'text-green-600' : 'text-gray-400'}`} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Kasa Durumu</h3>
-                      <p className="text-sm text-gray-500">
-                        {currentCashRegister
-                          ? `Acilis: ${new Date(currentCashRegister.openedAt || '').toLocaleString('tr-TR')}`
-                          : 'Kasa kapali'}
-                      </p>
-                    </div>
+          {/* ==================== ŞUBE KASALARI TAB ==================== */}
+          <TabsContent value="branches">
+            {/* Branch Summary */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="bg-white rounded-lg border-l-4 border-l-purple-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Store className="h-5 w-5 text-purple-600" />
                   </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Toplam Sube</p>
+                    <p className="text-xl font-semibold">{branchStats.activeBranches}</p>
+                  </div>
+                </div>
+              </div>
 
-                  <div className="text-right">
-                    <p className="text-sm text-gray-500">Guncel Bakiye</p>
-                    <p className="text-3xl font-bold text-green-600">
-                      €{stats.cashBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+              <div className="bg-white rounded-lg border-l-4 border-l-green-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Unlock className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Acik Kasalar</p>
+                    <p className="text-xl font-semibold text-green-600">{branchStats.openCashRegisters}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border-l-4 border-l-orange-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <Wallet className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Toplam Kasa</p>
+                    <p className="text-xl font-semibold text-orange-600">
+                      €{branchStats.totalBranchCash.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border-l-4 border-l-blue-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Toplam Banka</p>
+                    <p className="text-xl font-semibold text-blue-600">
+                      €{branchStats.totalBranchBankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Cash Actions */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              <Button
-                className="h-24 flex-col gap-2"
-                variant={currentCashRegister ? 'outline' : 'default'}
-                onClick={() => setCashOpenDialogOpen(true)}
-                disabled={!!currentCashRegister}
-              >
-                <Wallet className="h-6 w-6" />
-                <span>Kasa Ac</span>
-              </Button>
-
-              <Button
-                className="h-24 flex-col gap-2"
-                variant="outline"
-                onClick={() => setCashCloseDialogOpen(true)}
-                disabled={!currentCashRegister}
-              >
-                <Settings className="h-6 w-6" />
-                <span>Kasa Kapat</span>
-              </Button>
-
-              <Button
-                className="h-24 flex-col gap-2 bg-green-600 hover:bg-green-700"
-                onClick={() => {
-                  setCashTransactionType('income');
-                  setCashTransactionDialogOpen(true);
-                }}
-                disabled={!currentCashRegister}
-              >
-                <ArrowUpRight className="h-6 w-6" />
-                <span>Kasaya Giris</span>
-              </Button>
-
-              <Button
-                className="h-24 flex-col gap-2 bg-red-600 hover:bg-red-700"
-                onClick={() => {
-                  setCashTransactionType('expense');
-                  setCashTransactionDialogOpen(true);
-                }}
-                disabled={!currentCashRegister}
-              >
-                <ArrowDownRight className="h-6 w-6" />
-                <span>Kasadan Cikis</span>
-              </Button>
-            </div>
-
-            {/* Cash Transactions */}
+            {/* Branches List */}
             <div className="bg-white rounded-lg border">
               <div className="p-4 border-b">
-                <h3 className="font-semibold">Son Kasa Islemleri</h3>
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Store className="h-5 w-5" />
+                  Sube Kasa Durumlari
+                </h3>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tarih</TableHead>
-                    <TableHead>Tip</TableHead>
-                    <TableHead>Aciklama</TableHead>
-                    <TableHead>Kategori</TableHead>
-                    <TableHead className="text-right">Tutar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions
-                    .filter(tx => tx.accountType === 'cash')
-                    .slice(0, 10)
-                    .map((tx) => (
-                      <TableRow key={tx.id}>
-                        <TableCell>{tx.date || tx.createdAt?.split('T')[0]}</TableCell>
-                        <TableCell><TransactionTypeBadge type={tx.type || ''} /></TableCell>
-                        <TableCell>{tx.description}</TableCell>
-                        <TableCell>{tx.category}</TableCell>
-                        <TableCell className={`text-right font-medium ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                          {tx.type === 'income' ? '+' : '-'}€{(tx.amount || 0).toLocaleString('tr-TR')}
+
+              {branchesLoading ? (
+                <div className="p-8 text-center text-gray-500">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+                  Subeler yukleniyor...
+                </div>
+              ) : branches.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Store className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p>Henuz sube bulunamadi</p>
+                  <p className="text-sm mt-2">Desktop uygulamasinda subeler tanimlanmalidir</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {branches.filter(b => b.isActive !== false).map((branch) => {
+                    const cashRegister = branch.treasury?.cashRegister;
+                    const isOpen = cashRegister?.audit?.status === 'open';
+                    const cashBalance = cashRegister?.balance?.currentBalance || 0;
+
+                    // Banka hesaplari
+                    const bankAccountsObj = branch.treasury?.bankAccounts || {};
+                    const bankAccountsArray = Object.entries(bankAccountsObj).map(([id, acc]) => ({
+                      id,
+                      ...acc
+                    }));
+
+                    const totalBankBalance = bankAccountsArray.reduce(
+                      (sum, acc) => sum + (acc.balance?.currentBalance || 0),
+                      0
+                    );
+
+                    return (
+                      <div key={branch.id} className="p-4 hover:bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${isOpen ? 'bg-green-100' : 'bg-gray-100'}`}>
+                              {isOpen ? (
+                                <Unlock className="h-5 w-5 text-green-600" />
+                              ) : (
+                                <Lock className="h-5 w-5 text-gray-400" />
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-medium">{branch.name || branch.id}</h4>
+                              <p className="text-xs text-gray-500">
+                                {isOpen ? (
+                                  <>
+                                    Acik - {cashRegister?.audit?.openedAt
+                                      ? new Date(cashRegister.audit.openedAt).toLocaleString('tr-TR')
+                                      : '-'}
+                                  </>
+                                ) : (
+                                  'Kapali'
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-6">
+                            {/* Kasa Bakiyesi */}
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">Kasa</p>
+                              <p className={`text-lg font-semibold ${cashBalance > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                                €{cashBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+
+                            {/* Banka Bakiyesi */}
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">Banka ({bankAccountsArray.length})</p>
+                              <p className={`text-lg font-semibold ${totalBankBalance > 0 ? 'text-blue-600' : 'text-gray-600'}`}>
+                                €{totalBankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+
+                            {/* Toplam */}
+                            <div className="text-right border-l pl-4">
+                              <p className="text-xs text-gray-500">Toplam</p>
+                              <p className="text-lg font-bold">
+                                €{(cashBalance + totalBankBalance).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bank Accounts Details */}
+                        {bankAccountsArray.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-xs text-gray-500 mb-2">Banka Hesaplari:</p>
+                            <div className="grid grid-cols-4 gap-2">
+                              {bankAccountsArray.map((acc) => {
+                                const isCredit = acc.accountType === 'credit_line' || acc.accountType === 'leasing';
+                                const balance = acc.balance?.currentBalance || 0;
+
+                                return (
+                                  <div
+                                    key={acc.id}
+                                    className={`p-2 rounded-lg text-sm ${
+                                      isCredit ? 'bg-red-50' : 'bg-blue-50'
+                                    }`}
+                                  >
+                                    <p className="font-medium truncate">{acc.accountName || acc.bankName}</p>
+                                    <p className="text-xs text-gray-500">{acc.bankName}</p>
+                                    <p className={`font-semibold ${
+                                      isCredit
+                                        ? 'text-red-600'
+                                        : balance >= 0
+                                          ? 'text-blue-600'
+                                          : 'text-red-600'
+                                    }`}>
+                                      {acc.currency || 'EUR'} {balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                    {isCredit && acc.creditLimit && (
+                                      <p className="text-xs text-gray-500">
+                                        Limit: {acc.currency || 'EUR'} {(acc.creditLimit || 0).toLocaleString()}
+                                      </p>
+                                    )}
+                                    {acc.accountType === 'leasing' && acc.leasingAsset && (
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {acc.leasingAsset}
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ==================== KASA TAB ==================== */}
+          <TabsContent value="cash">
+            {/* Branch Selector */}
+            <div className="bg-white rounded-lg border mb-6 p-4">
+              <div className="flex items-center gap-4">
+                <Label className="font-semibold">Sube Sec:</Label>
+                <Select value={selectedKasaBranch} onValueChange={setSelectedKasaBranch}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Sube secin..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.filter(b => b.isActive !== false).map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        <div className="flex items-center gap-2">
+                          <Store className="h-4 w-4" />
+                          {branch.name}
+                          {branch.treasury?.cashRegister?.audit?.status === 'open' && (
+                            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Acik</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Selected Branch Cash Info */}
+            {selectedKasaBranch ? (() => {
+              const branch = branches.find(b => b.id === selectedKasaBranch);
+              if (!branch) return null;
+              const cashReg = branch.treasury?.cashRegister;
+              const isOpen = cashReg?.audit?.status === 'open';
+              const balance = cashReg?.balance?.currentBalance || 0;
+
+              return (
+                <>
+                  {/* Cash Status Card */}
+                  <div className="bg-white rounded-lg border mb-6">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-4 rounded-full ${isOpen ? 'bg-green-100' : 'bg-gray-100'}`}>
+                            <Wallet className={`h-8 w-8 ${isOpen ? 'text-green-600' : 'text-gray-400'}`} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold">{branch.name} - Kasa</h3>
+                            <p className="text-sm text-gray-500">
+                              {isOpen
+                                ? `Acilis: ${cashReg?.audit?.openedAt ? new Date(cashReg.audit.openedAt).toLocaleString('tr-TR') : '-'}`
+                                : 'Kasa kapali'}
+                            </p>
+                            {isOpen && cashReg?.audit?.openedBy && (
+                              <p className="text-xs text-gray-400">Acan: {cashReg.audit.openedBy}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Guncel Bakiye</p>
+                          <p className={`text-3xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            €{balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                          </p>
+                          {cashReg?.balance?.openingBalance !== undefined && (
+                            <p className="text-xs text-gray-400">
+                              Acilis: €{(cashReg.balance.openingBalance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Balance Details */}
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="bg-white rounded-lg border p-4">
+                      <p className="text-sm text-gray-500">Acilis Bakiyesi</p>
+                      <p className="text-xl font-semibold">
+                        €{(cashReg?.balance?.openingBalance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-lg border p-4">
+                      <p className="text-sm text-gray-500">Beklenen Bakiye</p>
+                      <p className="text-xl font-semibold">
+                        €{(cashReg?.balance?.expectedBalance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-lg border p-4">
+                      <p className="text-sm text-gray-500">Fark</p>
+                      <p className={`text-xl font-semibold ${((cashReg?.balance?.currentBalance || 0) - (cashReg?.balance?.expectedBalance || 0)) === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        €{((cashReg?.balance?.currentBalance || 0) - (cashReg?.balance?.expectedBalance || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Last Update */}
+                  {cashReg?.balance?.lastUpdate && (
+                    <div className="text-sm text-gray-500 mb-4">
+                      Son guncelleme: {new Date(cashReg.balance.lastUpdate).toLocaleString('tr-TR')}
+                    </div>
+                  )}
+                </>
+              );
+            })() : (
+              <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
+                <Store className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>Kasa bilgilerini gormek icin bir sube secin</p>
+              </div>
+            )}
+
+            {/* Cash Transactions - only show if branch selected */}
+            {selectedKasaBranch && (
+              <div className="bg-white rounded-lg border">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Kasa Islemleri - {branches.find(b => b.id === selectedKasaBranch)?.name}</h3>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>Tip</TableHead>
+                      <TableHead>Aciklama</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead className="text-right">Tutar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions
+                      .filter(tx => tx.accountType === 'cash' && tx.branch === selectedKasaBranch)
+                      .slice(0, 20)
+                      .map((tx) => (
+                        <TableRow key={tx.id}>
+                          <TableCell>{tx.date || tx.createdAt?.split('T')[0]}</TableCell>
+                          <TableCell><TransactionTypeBadge type={tx.type || ''} /></TableCell>
+                          <TableCell>{tx.description}</TableCell>
+                          <TableCell>{tx.category}</TableCell>
+                          <TableCell className={`text-right font-medium ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {tx.type === 'income' ? '+' : '-'}€{(tx.amount || 0).toLocaleString('tr-TR')}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {transactions.filter(tx => tx.accountType === 'cash' && tx.branch === selectedKasaBranch).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                          Bu subeye ait kasa islemi bulunamadi
                         </TableCell>
                       </TableRow>
-                    ))}
-                  {transactions.filter(tx => tx.accountType === 'cash').length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                        Kasa islemi bulunamadi
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </TabsContent>
 
           {/* ==================== BANKA TAB ==================== */}
           <TabsContent value="bank">
-            {/* Bank Summary */}
-            <div className="bg-white rounded-lg border mb-6 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-4 rounded-full bg-blue-100">
-                    <Building2 className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Toplam Banka Bakiyesi</h3>
-                    <p className="text-sm text-gray-500">{bankAccounts.length} hesap</p>
-                  </div>
-                </div>
-                <p className="text-3xl font-bold text-blue-600">
-                  €{stats.bankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                </p>
+            {/* Branch Selector */}
+            <div className="bg-white rounded-lg border mb-6 p-4">
+              <div className="flex items-center gap-4">
+                <Label className="font-semibold">Sube Sec:</Label>
+                <Select value={selectedBankaBranch} onValueChange={setSelectedBankaBranch}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Sube secin..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.filter(b => b.isActive !== false).map((branch) => {
+                      const bankAccs = branch.treasury?.bankAccounts;
+                      const accountCount = bankAccs ? Object.keys(bankAccs).length : 0;
+                      return (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          <div className="flex items-center gap-2">
+                            <Store className="h-4 w-4" />
+                            {branch.name}
+                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                              {accountCount} hesap
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {/* Bank Actions */}
-            <div className="flex gap-4 mb-6">
-              <Button onClick={() => {
-                setSelectedBankAccount(null);
-                setBankAccountDialogOpen(true);
-              }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Yeni Hesap
-              </Button>
-              <Button variant="outline" onClick={() => setBankTransactionDialogOpen(true)}>
-                <ArrowUpRight className="h-4 w-4 mr-2" />
-                Havale / EFT
-              </Button>
-              <Button variant="outline" onClick={() => setBankAccountsListOpen(true)}>
-                <List className="h-4 w-4 mr-2" />
-                Tum Hesaplar
-              </Button>
-            </div>
+            {/* Selected Branch Bank Info */}
+            {selectedBankaBranch ? (() => {
+              const branch = branches.find(b => b.id === selectedBankaBranch);
+              if (!branch) return null;
 
-            {/* Bank Accounts Grid */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              {bankAccounts.map((account) => (
-                <div key={account.id} className="bg-white rounded-lg border p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold">{account.name}</h4>
-                      <p className="text-sm text-gray-500">{account.bankName}</p>
+              // Banka hesaplari
+              const bankAccountsObj = branch.treasury?.bankAccounts || {};
+              const branchBankAccounts = Object.entries(bankAccountsObj).map(([id, acc]) => ({
+                id,
+                ...acc
+              }));
+
+              const totalBalance = branchBankAccounts.reduce(
+                (sum, acc) => sum + (acc.balance?.currentBalance || 0),
+                0
+              );
+
+              return (
+                <>
+                  {/* Bank Summary Card */}
+                  <div className="bg-white rounded-lg border mb-6 p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-4 rounded-full bg-blue-100">
+                          <Building2 className="h-8 w-8 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold">{branch.name} - Banka Hesaplari</h3>
+                          <p className="text-sm text-gray-500">{branchBankAccounts.length} hesap</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">Toplam Bakiye</p>
+                        <p className={`text-3xl font-bold ${totalBalance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          €{totalBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditBankAccount(account)}>
-                          <Edit className="h-4 w-4 mr-2" /> Duzenle
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleDeleteBankAccount(account)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" /> Sil
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
-                  <p className="text-xs text-gray-400 mb-2 font-mono">{account.iban}</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    €{(account.balance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              ))}
-              {bankAccounts.length === 0 && (
-                <div className="col-span-3 bg-white rounded-lg border p-8 text-center">
-                  <Building2 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">Henuz banka hesabi eklenmemis</p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => {
-                      setSelectedBankAccount(null);
-                      setBankAccountDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ilk Hesabi Ekle
-                  </Button>
-                </div>
-              )}
-            </div>
 
-            {/* Bank Transactions */}
-            <div className="bg-white rounded-lg border">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold">Son Banka Islemleri</h3>
+                  {/* Bank Accounts Grid */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    {branchBankAccounts.map((account) => {
+                      const isCredit = account.accountType === 'credit_line' || account.accountType === 'leasing';
+                      const balance = account.balance?.currentBalance || 0;
+
+                      return (
+                        <div key={account.id} className={`bg-white rounded-lg border p-4 ${isCredit ? 'border-red-200' : ''}`}>
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h4 className="font-semibold">{account.accountName || account.bankName}</h4>
+                              <p className="text-sm text-gray-500">{account.bankName}</p>
+                              {account.accountType && (
+                                <span className={`text-xs px-2 py-0.5 rounded mt-1 inline-block ${
+                                  isCredit ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {account.accountType === 'checking' ? 'Vadesiz' :
+                                   account.accountType === 'savings' ? 'Vadeli' :
+                                   account.accountType === 'foreign' ? 'Doviz' :
+                                   account.accountType === 'business' ? 'Ticari' :
+                                   account.accountType === 'credit_line' ? 'Kredi' :
+                                   account.accountType === 'leasing' ? 'Leasing' : account.accountType}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {account.iban && (
+                            <p className="text-xs text-gray-400 mb-2 font-mono">{account.iban}</p>
+                          )}
+
+                          <p className={`text-2xl font-bold ${
+                            isCredit ? 'text-red-600' : balance >= 0 ? 'text-blue-600' : 'text-red-600'
+                          }`}>
+                            {account.currency || 'EUR'} {balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                          </p>
+
+                          {/* Credit/Leasing specific info */}
+                          {isCredit && account.creditLimit && (
+                            <div className="mt-2 text-sm">
+                              <p className="text-gray-500">Limit: {account.currency || 'EUR'} {(account.creditLimit || 0).toLocaleString()}</p>
+                              <p className="text-gray-500">Kullanilan: {account.currency || 'EUR'} {(account.usedAmount || 0).toLocaleString()}</p>
+                            </div>
+                          )}
+                          {account.accountType === 'leasing' && account.leasingAsset && (
+                            <p className="mt-2 text-sm text-gray-500">{account.leasingAsset}</p>
+                          )}
+
+                          {/* Last update */}
+                          {account.balance?.lastUpdated && (
+                            <p className="mt-2 text-xs text-gray-400">
+                              Son: {new Date(account.balance.lastUpdated).toLocaleDateString('tr-TR')}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {branchBankAccounts.length === 0 && (
+                      <div className="col-span-2 bg-white rounded-lg border p-8 text-center">
+                        <Building2 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                        <p className="text-gray-500">Bu subede banka hesabi bulunamadi</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bank Transactions for this branch */}
+                  <div className="bg-white rounded-lg border">
+                    <div className="p-4 border-b">
+                      <h3 className="font-semibold">Banka Islemleri - {branch.name}</h3>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tarih</TableHead>
+                          <TableHead>Tip</TableHead>
+                          <TableHead>Hesap</TableHead>
+                          <TableHead>Aciklama</TableHead>
+                          <TableHead className="text-right">Tutar</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions
+                          .filter(tx => tx.accountType === 'bank' && tx.branch === selectedBankaBranch)
+                          .slice(0, 20)
+                          .map((tx) => (
+                            <TableRow key={tx.id}>
+                              <TableCell>{tx.date || tx.createdAt?.split('T')[0]}</TableCell>
+                              <TableCell><TransactionTypeBadge type={tx.type || ''} /></TableCell>
+                              <TableCell>{branchBankAccounts.find(a => a.id === tx.accountId)?.accountName || branchBankAccounts.find(a => a.id === tx.accountId)?.bankName || tx.accountId || '-'}</TableCell>
+                              <TableCell>{tx.description}</TableCell>
+                              <TableCell className={`text-right font-medium ${tx.type === 'deposit' || tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                {tx.type === 'deposit' || tx.type === 'income' ? '+' : '-'}€{(tx.amount || 0).toLocaleString('tr-TR')}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        {transactions.filter(tx => tx.accountType === 'bank' && tx.branch === selectedBankaBranch).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                              Bu subeye ait banka islemi bulunamadi
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            })() : (
+              <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
+                <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>Banka bilgilerini gormek icin bir sube secin</p>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tarih</TableHead>
-                    <TableHead>Tip</TableHead>
-                    <TableHead>Hesap</TableHead>
-                    <TableHead>Aciklama</TableHead>
-                    <TableHead className="text-right">Tutar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions
-                    .filter(tx => tx.accountType === 'bank')
-                    .slice(0, 10)
-                    .map((tx) => (
-                      <TableRow key={tx.id}>
-                        <TableCell>{tx.date || tx.createdAt?.split('T')[0]}</TableCell>
-                        <TableCell><TransactionTypeBadge type={tx.type || ''} /></TableCell>
-                        <TableCell>{bankAccounts.find(a => a.id === tx.accountId)?.name || '-'}</TableCell>
-                        <TableCell>{tx.description}</TableCell>
-                        <TableCell className={`text-right font-medium ${tx.type === 'deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                          {tx.type === 'deposit' ? '+' : '-'}€{(tx.amount || 0).toLocaleString('tr-TR')}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {transactions.filter(tx => tx.accountType === 'bank').length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                        Banka islemi bulunamadi
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            )}
           </TabsContent>
 
           {/* ==================== KREDILER TAB ==================== */}

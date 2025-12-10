@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Search,
@@ -13,10 +13,22 @@ import {
   Download,
   Loader2,
   FileText,
+  RefreshCw,
+  Store,
+  CheckCircle,
+  Clock,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -25,26 +37,50 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { subscribeToData, removeData } from '@/services/firebase';
+import { subscribeToFirestore, deleteFirestoreData, subscribeToBranches } from '@/services/firebase';
 import { PurchaseInvoiceDialog } from '@/components/dialogs/purchase-invoice-dialog';
+import { toast } from 'sonner';
 
 interface PurchaseInvoice {
   id: string;
-  invoiceNo: string;
-  date: string;
+  invoiceNo?: string;
+  invoice_number?: string;
+  date?: string;
+  invoice_date?: string;
   dueDate?: string;
-  supplier: string;
+  due_date?: string;
+  supplier?: string;
+  supplier_name?: string;
   supplierId?: string;
-  items: any[];
-  subtotal: number;
-  vatAmount: number;
-  total: number;
-  status: string;
-  paymentStatus: string;
+  supplier_id?: string;
+  branchId?: string;
+  branch_id?: string;
+  items?: any[];
+  subtotal?: number;
+  vatAmount?: number;
+  total_tax?: number;
+  total?: number;
+  grand_total?: number;
+  status?: string;
+  paymentStatus?: string;
   notes?: string;
-  createdAt: string;
-  createdBy: string;
+  createdAt?: string;
+  created_at?: string;
+  createdBy?: string;
+}
+
+interface Branch {
+  id: string;
+  name?: string;
+  isActive?: boolean;
 }
 
 const statusLabels: Record<string, { label: string; color: string }> = {
@@ -62,49 +98,73 @@ const paymentStatusLabels: Record<string, { label: string; color: string }> = {
 
 export default function PurchaseInvoicesPage() {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<PurchaseInvoice | null>(null);
 
   useEffect(() => {
-    // Firebase'den alış faturalarını dinle
-    const unsubscribe = subscribeToData('purchase_invoices', (data) => {
+    // Firebase Firestore'dan alış faturalarını dinle
+    const unsubInvoices = subscribeToFirestore('purchases', (data) => {
       if (data) {
-        const invoiceList = Object.entries(data).map(([id, inv]: [string, any]) => ({
-          id,
-          ...inv,
-        }));
-        // Tarihe göre sırala (en yeni önce)
-        invoiceList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setInvoices(invoiceList);
+        // Sort by date descending
+        const sorted = [...data].sort((a, b) => {
+          const dateA = new Date(a.date || a.invoice_date || a.createdAt || a.created_at || '').getTime();
+          const dateB = new Date(b.date || b.invoice_date || b.createdAt || b.created_at || '').getTime();
+          return dateB - dateA;
+        });
+        setInvoices(sorted);
       } else {
         setInvoices([]);
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubBranches = subscribeToBranches((data) => {
+      setBranches(data || []);
+    });
+
+    return () => {
+      unsubInvoices();
+      unsubBranches();
+    };
   }, []);
 
-  const filteredInvoices = invoices.filter((invoice) => {
-    const matchesSearch =
-      invoice.invoiceNo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.supplier?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      selectedStatus === 'all' || invoice.status === selectedStatus;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) => {
+      const invoiceNo = invoice.invoiceNo || invoice.invoice_number || '';
+      const supplier = invoice.supplier || invoice.supplier_name || '';
+      const branchId = invoice.branchId || invoice.branch_id || '';
 
-  const stats = {
-    total: invoices.length,
-    totalAmount: invoices.reduce((sum, i) => sum + (i.total || 0), 0),
-    unpaid: invoices.filter((i) => i.paymentStatus === 'unpaid').length,
-    unpaidAmount: invoices
-      .filter((i) => i.paymentStatus === 'unpaid')
-      .reduce((sum, i) => sum + (i.total || 0), 0),
-  };
+      const matchesSearch =
+        invoiceNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        supplier.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus =
+        selectedStatus === 'all' || invoice.status === selectedStatus;
+      const matchesBranch =
+        selectedBranch === 'all' || branchId === selectedBranch;
+
+      return matchesSearch && matchesStatus && matchesBranch;
+    });
+  }, [invoices, searchQuery, selectedStatus, selectedBranch]);
+
+  const stats = useMemo(() => {
+    const total = invoices.length;
+    const totalAmount = invoices.reduce((sum, i) => sum + (i.total || i.grand_total || 0), 0);
+    const unpaid = invoices.filter((i) => i.paymentStatus === 'unpaid' || i.status === 'pending').length;
+    const unpaidAmount = invoices
+      .filter((i) => i.paymentStatus === 'unpaid' || i.status === 'pending')
+      .reduce((sum, i) => sum + (i.total || i.grand_total || 0), 0);
+    const paidCount = invoices.filter((i) => i.paymentStatus === 'paid' || i.status === 'paid').length;
+    const paidAmount = invoices
+      .filter((i) => i.paymentStatus === 'paid' || i.status === 'paid')
+      .reduce((sum, i) => sum + (i.total || i.grand_total || 0), 0);
+
+    return { total, totalAmount, unpaid, unpaidAmount, paidCount, paidAmount };
+  }, [invoices]);
 
   const handleNewInvoice = () => {
     setEditingInvoice(null);
@@ -117,13 +177,26 @@ export default function PurchaseInvoicesPage() {
   };
 
   const handleDeleteInvoice = async (invoice: PurchaseInvoice) => {
-    if (confirm(`"${invoice.invoiceNo}" faturasini silmek istediginize emin misiniz?`)) {
+    const invoiceNo = invoice.invoiceNo || invoice.invoice_number || invoice.id;
+    if (confirm(`"${invoiceNo}" faturasini silmek istediginize emin misiniz?`)) {
       try {
-        await removeData(`purchase_invoices/${invoice.id}`);
+        await deleteFirestoreData('purchases', invoice.id);
+        toast.success('Fatura silindi');
       } catch (error) {
-        alert('Silme hatasi: ' + (error as Error).message);
+        toast.error('Silme hatasi: ' + (error as Error).message);
       }
     }
+  };
+
+  const handleRefresh = () => {
+    setLoading(true);
+    setTimeout(() => setLoading(false), 500);
+  };
+
+  const getBranchName = (branchId?: string) => {
+    if (!branchId) return '-';
+    const branch = branches.find(b => b.id === branchId);
+    return branch?.name || branchId;
   };
 
   if (loading) {
@@ -146,6 +219,10 @@ export default function PurchaseInvoicesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Yenile
+          </Button>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Excel
@@ -218,19 +295,35 @@ export default function PurchaseInvoicesPage() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Fatura no veya tedarikçi ara..."
+                  placeholder="Fatura no veya tedarikci ara..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
                 />
               </div>
+
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="w-[180px]">
+                  <Store className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Sube" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tum Subeler</SelectItem>
+                  {branches.filter(b => b.isActive !== false).map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <div className="flex gap-2">
                 <Button
                   variant={selectedStatus === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedStatus('all')}
                 >
-                  Tümü
+                  Tumu
                 </Button>
                 {Object.entries(statusLabels).map(([key, { label }]) => (
                   <Button
@@ -256,88 +349,97 @@ export default function PurchaseInvoicesPage() {
               <TableRow>
                 <TableHead>Fatura No</TableHead>
                 <TableHead>Tarih</TableHead>
-                <TableHead>Tedarikçi</TableHead>
+                <TableHead>Tedarikci</TableHead>
+                <TableHead>Sube</TableHead>
                 <TableHead className="text-right">Ara Toplam</TableHead>
                 <TableHead className="text-right">KDV</TableHead>
                 <TableHead className="text-right">Toplam</TableHead>
                 <TableHead>Durum</TableHead>
-                <TableHead>Ödeme</TableHead>
-                <TableHead className="w-[100px]">İşlem</TableHead>
+                <TableHead>Odeme</TableHead>
+                <TableHead className="w-[100px]">Islem</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredInvoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium">Fatura bulunamadı</h3>
+                    <h3 className="text-lg font-medium">Fatura bulunamadi</h3>
                     <p className="text-muted-foreground">
-                      Henüz alış faturası eklenmemiş veya arama kriterlerine uygun sonuç yok.
+                      Henuz alis faturasi eklenmemis veya arama kriterlerine uygun sonuc yok.
                     </p>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInvoices.map((invoice) => (
+                filteredInvoices.slice(0, 100).map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium font-mono">
-                      {invoice.invoiceNo}
+                      {invoice.invoiceNo || invoice.invoice_number || '-'}
                     </TableCell>
-                    <TableCell>{formatDate(invoice.date)}</TableCell>
-                    <TableCell>{invoice.supplier || '-'}</TableCell>
+                    <TableCell>{formatDate(invoice.date || invoice.invoice_date || invoice.createdAt || new Date())}</TableCell>
+                    <TableCell>{invoice.supplier || invoice.supplier_name || '-'}</TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {getBranchName(invoice.branchId || invoice.branch_id)}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(invoice.subtotal || 0)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-muted-foreground">
-                      {formatCurrency(invoice.vatAmount || 0)}
+                      {formatCurrency(invoice.vatAmount || invoice.total_tax || 0)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(invoice.total || 0)}
+                      {formatCurrency(invoice.total || invoice.grand_total || 0)}
                     </TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          statusLabels[invoice.status]?.color || 'bg-gray-100'
+                          statusLabels[invoice.status || 'pending']?.color || 'bg-gray-100'
                         }`}
                       >
-                        {statusLabels[invoice.status]?.label || invoice.status}
+                        {statusLabels[invoice.status || 'pending']?.label || invoice.status || 'Beklemede'}
                       </span>
                     </TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          paymentStatusLabels[invoice.paymentStatus]?.color || 'bg-gray-100'
+                          paymentStatusLabels[invoice.paymentStatus || 'unpaid']?.color || 'bg-gray-100'
                         }`}
                       >
-                        {paymentStatusLabels[invoice.paymentStatus]?.label || invoice.paymentStatus}
+                        {paymentStatusLabels[invoice.paymentStatus || 'unpaid']?.label || invoice.paymentStatus || 'Odenmedi'}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditInvoice(invoice)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditInvoice(invoice)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => handleDeleteInvoice(invoice)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Goruntule
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Duzenle
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Printer className="h-4 w-4 mr-2" />
+                            Yazdir
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteInvoice(invoice)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Sil
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

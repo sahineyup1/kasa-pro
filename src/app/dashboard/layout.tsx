@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { AuthGuard } from '@/components/auth/auth-guard';
 import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
@@ -75,42 +76,44 @@ export default function DashboardLayout({
   }, [children]);
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Mobile Overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => {
-            setMobileMenuOpen(false);
-            window.dispatchEvent(new CustomEvent('mobile-menu-toggle', { detail: { open: false } }));
-          }}
-        />
-      )}
-
-      {/* Sidebar */}
-      <Sidebar mobileOpen={mobileMenuOpen} onMobileClose={() => {
-        setMobileMenuOpen(false);
-        window.dispatchEvent(new CustomEvent('mobile-menu-toggle', { detail: { open: false } }));
-      }} />
-
-      {/* Main Content */}
-      <div
-        className={cn(
-          'transition-all duration-300',
-          // Desktop: sidebar genişliğine göre padding
-          'lg:pl-64',
-          sidebarCollapsed && 'lg:pl-16',
-          // Mobile: padding yok
-          'pl-0'
+    <AuthGuard>
+      <div className="min-h-screen bg-muted/30">
+        {/* Mobile Overlay */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              window.dispatchEvent(new CustomEvent('mobile-menu-toggle', { detail: { open: false } }));
+            }}
+          />
         )}
-      >
-        <Header onMobileMenuToggle={() => {
-          const newState = !mobileMenuOpen;
-          setMobileMenuOpen(newState);
-          window.dispatchEvent(new CustomEvent('mobile-menu-toggle', { detail: { open: newState } }));
+
+        {/* Sidebar */}
+        <Sidebar mobileOpen={mobileMenuOpen} onMobileClose={() => {
+          setMobileMenuOpen(false);
+          window.dispatchEvent(new CustomEvent('mobile-menu-toggle', { detail: { open: false } }));
         }} />
-        <main className="p-4 lg:p-6">{children}</main>
+
+        {/* Main Content */}
+        <div
+          className={cn(
+            'transition-all duration-300',
+            // Desktop: sidebar genisligine gore padding
+            'lg:pl-64',
+            sidebarCollapsed && 'lg:pl-16',
+            // Mobile: padding yok
+            'pl-0'
+          )}
+        >
+          <Header onMobileMenuToggle={() => {
+            const newState = !mobileMenuOpen;
+            setMobileMenuOpen(newState);
+            window.dispatchEvent(new CustomEvent('mobile-menu-toggle', { detail: { open: newState } }));
+          }} />
+          <main className="p-4 lg:p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }

@@ -265,6 +265,77 @@ export const deleteFirestoreData = async (collectionName: string, docId: string)
   await deleteDoc(docRef);
 };
 
+// =================== COMPANY DATA (erp/company/ path) ===================
+
+// Subscribe to company data (branches, settings, etc.) - under erp/ prefix
+export const subscribeToCompanyData = (
+  path: string,
+  callback: (data: any) => void
+) => {
+  // Python kasa uses erp/company/branches path
+  const fullPath = `erp/company/${path}`;
+  console.log('Subscribing to Company data:', fullPath);
+
+  const unsubscribe = onValue(
+    ref(database, fullPath),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        console.log(`Company data empty for ${fullPath}`);
+        callback(null);
+        return;
+      }
+      const rawData = snapshot.val();
+      console.log(`Company data received for ${fullPath}:`, rawData ? Object.keys(rawData) : 'null');
+      callback(rawData);
+    },
+    (error) => {
+      console.error(`Company data error for ${fullPath}:`, error);
+      callback(null);
+    }
+  );
+
+  return unsubscribe;
+};
+
+// Get company branches with treasury data
+export const subscribeToBranches = (
+  callback: (branches: any[]) => void
+) => {
+  return subscribeToCompanyData('branches', (data) => {
+    if (!data) {
+      console.log('Branches: No data received');
+      callback([]);
+      return;
+    }
+
+    // Dict -> Array dönüşümü
+    let branches: any[] = [];
+
+    if (Array.isArray(data)) {
+      // Zaten array ise
+      branches = data.map((item, index) => ({
+        id: item?.id || `branch_${index}`,
+        _id: item?.id || `branch_${index}`,
+        ...item
+      }));
+    } else if (typeof data === 'object') {
+      // Object ise dict -> array
+      branches = Object.entries(data).map(([key, value]: [string, any]) => ({
+        id: key,
+        _id: key,
+        ...value
+      }));
+    }
+
+    console.log('Branches loaded:', branches.length, branches.map(b => b.name || b.id));
+    // Debug: İlk şubenin yapısını göster
+    if (branches.length > 0) {
+      console.log('First branch structure:', JSON.stringify(branches[0], null, 2));
+    }
+    callback(branches);
+  });
+};
+
 export {
   app, auth, database, firestore,
   ref, get, set, push, update, remove, onValue, query, orderByChild, equalTo,

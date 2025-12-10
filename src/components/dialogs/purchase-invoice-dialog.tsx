@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Calculator } from 'lucide-react';
+import { Plus, Trash2, Calculator, Store, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { pushData, updateData, subscribeToData } from '@/services/firebase';
+import { addFirestoreData, updateFirestoreData, subscribeToRTDB, subscribeToBranches } from '@/services/firebase';
+import { toast } from 'sonner';
 
 // DDV Oranları (Slovenya)
 const DDV_RATES = [
@@ -51,6 +52,12 @@ interface Supplier {
   taxNumber?: string;
 }
 
+interface Branch {
+  id: string;
+  name?: string;
+  isActive?: boolean;
+}
+
 interface InvoiceItem {
   id: string;
   description: string;
@@ -75,6 +82,7 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [branchId, setBranchId] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [supplierDdvNo, setSupplierDdvNo] = useState('');
   const [status, setStatus] = useState('pending');
@@ -83,23 +91,35 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // Suppliers from Firebase
+  // Suppliers and Branches from Firebase
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
-  // Load suppliers
+  // Load suppliers from partners path (type=supplier)
   useEffect(() => {
-    const unsubscribe = subscribeToData('suppliers', (data) => {
+    const unsubSuppliers = subscribeToRTDB('partners', (data) => {
       if (data) {
-        const list = Object.entries(data).map(([id, s]: [string, any]) => ({
-          id,
-          name: s.name || s.companyName || '',
-          taxNumber: s.taxNumber || s.ddvNumber || '',
-        })).filter(s => s.name);
-        list.sort((a, b) => a.name.localeCompare(b.name));
-        setSuppliers(list);
+        const supplierList = data
+          .filter((p: any) => p.basic?.type === 'supplier' || p.type === 'supplier')
+          .map((p: any) => ({
+            id: p.id || p._id,
+            name: p.basic?.name || p.name || p.companyName || '',
+            taxNumber: p.tax?.taxId || p.financial?.vatNumber || p.taxNumber || p.ddvNumber || '',
+          }))
+          .filter((s: Supplier) => s.name);
+        supplierList.sort((a: Supplier, b: Supplier) => a.name.localeCompare(b.name));
+        setSuppliers(supplierList);
       }
     });
-    return () => unsubscribe();
+
+    const unsubBranches = subscribeToBranches((data) => {
+      setBranches(data || []);
+    });
+
+    return () => {
+      unsubSuppliers();
+      unsubBranches();
+    };
   }, []);
 
   // Reset form when dialog opens
@@ -110,28 +130,30 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
 
       if (invoice) {
         // Edit mode
-        setInvoiceNo(invoice.invoiceNo || '');
-        setInvoiceDate(invoice.date || today);
-        setDueDate(invoice.dueDate || thirtyDaysLater);
-        setSupplierId(invoice.supplierId || '');
+        setInvoiceNo(invoice.invoiceNo || invoice.invoice_number || '');
+        setInvoiceDate(invoice.date || invoice.invoice_date || today);
+        setDueDate(invoice.dueDate || invoice.due_date || thirtyDaysLater);
+        setBranchId(invoice.branchId || invoice.branch_id || '');
+        setSupplierId(invoice.supplierId || invoice.supplier_id || '');
         setSupplierDdvNo(invoice.supplierDdvNo || '');
         setStatus(invoice.status || 'pending');
         setPaymentStatus(invoice.paymentStatus || 'unpaid');
         setNotes(invoice.notes || '');
         setItems(invoice.items?.map((item: any, index: number) => ({
           id: item.id || `item-${index}`,
-          description: item.description || '',
+          description: item.description || item.name || '',
           quantity: item.quantity || 1,
-          unitPrice: item.unitPrice || 0,
-          ddvRate: item.ddvRate || 22,
-          ddvAmount: item.ddvAmount || 0,
-          total: item.total || 0,
+          unitPrice: item.unitPrice || item.unit_price || 0,
+          ddvRate: item.ddvRate || item.tax_rate || 22,
+          ddvAmount: item.ddvAmount || item.tax_amount || 0,
+          total: item.total || item.line_total || 0,
         })) || []);
       } else {
         // New invoice
         setInvoiceNo('');
         setInvoiceDate(today);
         setDueDate(thirtyDaysLater);
+        setBranchId('');
         setSupplierId('');
         setSupplierDdvNo('');
         setStatus('pending');
@@ -195,11 +217,15 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
   const handleSave = async () => {
     // Validation
     if (!invoiceNo.trim()) {
-      alert('Lutfen fatura numarasi girin!');
+      toast.error('Lutfen fatura numarasi girin!');
+      return;
+    }
+    if (!branchId) {
+      toast.error('Lutfen sube secin!');
       return;
     }
     if (items.length === 0 || items.every(i => !i.description)) {
-      alert('Lutfen en az bir kalem ekleyin!');
+      toast.error('Lutfen en az bir kalem ekleyin!');
       return;
     }
 
@@ -208,42 +234,63 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
       const supplier = suppliers.find(s => s.id === supplierId);
 
       const invoiceData: Record<string, any> = {
+        invoice_number: invoiceNo.trim(),
         invoiceNo: invoiceNo.trim(),
+        type: 'purchase',
+        invoice_date: invoiceDate,
         date: invoiceDate,
+        due_date: dueDate || null,
         dueDate: dueDate || null,
+        branch_id: branchId,
+        branchId: branchId,
+        supplier_id: supplierId || null,
         supplierId: supplierId || null,
+        supplier_name: supplier?.name || '',
         supplier: supplier?.name || '',
         supplierDdvNo: supplierDdvNo.trim(),
         status,
         paymentStatus,
         items: items.filter(i => i.description).map(item => ({
+          name: item.description,
           description: item.description,
           quantity: item.quantity,
+          unit_price: item.unitPrice,
           unitPrice: item.unitPrice,
+          tax_rate: item.ddvRate,
           ddvRate: item.ddvRate,
+          tax_base: item.quantity * item.unitPrice,
+          tax_amount: item.ddvAmount,
           ddvAmount: item.ddvAmount,
+          line_total: item.total,
           total: item.total,
         })),
         subtotal,
+        total_tax: vatAmount,
         vatAmount,
+        grand_total: total,
         total,
+        total_paid: paymentStatus === 'paid' ? total : 0,
+        remaining_amount: paymentStatus === 'paid' ? 0 : total,
         notes: notes.trim(),
         currency: 'EUR',
         updatedAt: new Date().toISOString(),
       };
 
       if (isEditMode && invoice?.id) {
-        await updateData(`purchase_invoices/${invoice.id}`, invoiceData);
+        await updateFirestoreData('purchases', invoice.id, invoiceData);
+        toast.success('Fatura guncellendi');
       } else {
         invoiceData.createdAt = new Date().toISOString();
-        await pushData('purchase_invoices', invoiceData);
+        invoiceData.created_at = new Date().toISOString();
+        await addFirestoreData('purchases', invoiceData);
+        toast.success('Fatura olusturuldu');
       }
 
       onOpenChange(false);
       onSave?.();
     } catch (error) {
       console.error('Save error:', error);
-      alert('Kaydetme hatasi: ' + (error as Error).message);
+      toast.error('Kaydetme hatasi: ' + (error as Error).message);
     } finally {
       setSaving(false);
     }
@@ -264,14 +311,30 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
             <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">
               Fatura Bilgileri
             </h3>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="branchId">Sube *</Label>
+                <Select value={branchId} onValueChange={setBranchId}>
+                  <SelectTrigger>
+                    <Store className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Sube secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.filter(b => b.isActive !== false).map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="invoiceNo">Fatura No *</Label>
                 <Input
                   id="invoiceNo"
                   value={invoiceNo}
                   onChange={(e) => setInvoiceNo(e.target.value)}
-                  placeholder="Orn: FAT-2024-001"
+                  placeholder="Orn: ALI-2024-001"
                 />
               </div>
               <div className="space-y-2">

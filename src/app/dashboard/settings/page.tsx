@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: user?.fullName || '',
-    email: user?.email || '',
+    username: user?.username || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
@@ -79,12 +79,13 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">E-posta</label>
+              <label className="text-sm font-medium">Kullanici Adi</label>
               <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="ornek@firma.com"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="kullanici_adi"
+                disabled
               />
             </div>
           </div>
