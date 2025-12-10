@@ -18,6 +18,9 @@ import {
   CheckCircle,
   Clock,
   Printer,
+  FileCode,
+  FileSpreadsheet,
+  Upload,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +50,8 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { subscribeToFirestore, deleteFirestoreData, subscribeToBranches } from '@/services/firebase';
 import { PurchaseInvoiceDialog } from '@/components/dialogs/purchase-invoice-dialog';
+import { XMLInvoiceImportDialog } from '@/components/dialogs/xml-invoice-import-dialog';
+import { ExcelInvoiceImportDialog } from '@/components/dialogs/excel-invoice-import-dialog';
 import { toast } from 'sonner';
 
 interface PurchaseInvoice {
@@ -105,6 +110,8 @@ export default function PurchaseInvoicesPage() {
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<PurchaseInvoice | null>(null);
+  const [xmlImportOpen, setXmlImportOpen] = useState(false);
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
 
   useEffect(() => {
     // Firebase Firestore'dan alış faturalarını dinle
@@ -223,9 +230,27 @@ export default function PurchaseInvoicesPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Yenile
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />
+                İçe Aktar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setXmlImportOpen(true)}>
+                <FileCode className="h-4 w-4 mr-2" />
+                XML Fatura (e-Fatura)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setExcelImportOpen(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel Dosyası
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
-            Excel
+            Dışa Aktar
           </Button>
           <Button size="sm" onClick={handleNewInvoice}>
             <Plus className="h-4 w-4 mr-2" />
@@ -454,6 +479,18 @@ export default function PurchaseInvoicesPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         invoice={editingInvoice}
+      />
+
+      {/* XML Invoice Import Dialog */}
+      <XMLInvoiceImportDialog
+        open={xmlImportOpen}
+        onOpenChange={setXmlImportOpen}
+      />
+
+      {/* Excel Invoice Import Dialog */}
+      <ExcelInvoiceImportDialog
+        open={excelImportOpen}
+        onOpenChange={setExcelImportOpen}
       />
     </div>
   );

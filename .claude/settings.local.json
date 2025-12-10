@@ -20,7 +20,8 @@
       "Bash(del \"C:\\Users\\Sahin\\Desktop\\kasa-pro\\.git\\index.lock\")",
       "Bash(if exist \".git\\index.lock\" del /f \".git\\index.lock\")",
       "Bash(curl:*)",
-      "WebFetch(domain:erp.atlasgroup.si)"
+      "WebFetch(domain:erp.atlasgroup.si)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }
