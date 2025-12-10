@@ -19,14 +19,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { addFirestoreData, updateFirestoreData } from '@/services/firebase';
-import { Loader2, Building2, User, CreditCard, MapPin, Phone } from 'lucide-react';
+import { pushData, updateData } from '@/services/firebase';
+import { Loader2, Building2, User, CreditCard, MapPin, Phone, Shield, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+
+// VIES API validation function
+async function validateVATNumber(vatNumber: string): Promise<{
+  valid: boolean;
+  countryCode?: string;
+  vatNumber?: string;
+  companyName?: string;
+  companyAddress?: string;
+  error?: string;
+}> {
+  try {
+    // Extract country code and number
+    const countryCode = vatNumber.substring(0, 2).toUpperCase();
+    const number = vatNumber.substring(2).replace(/\s/g, '');
+
+    // Call VIES SOAP API via a simple approach
+    const response = await fetch('https://ec.europa.eu/taxation_customs/vies/rest-api/ms/' + countryCode + '/vat/' + number);
+
+    if (!response.ok) {
+      throw new Error('VIES API error');
+    }
+
+    const data = await response.json();
+
+    return {
+      valid: data.isValid === true,
+      countryCode: data.countryCode,
+      vatNumber: data.vatNumber,
+      companyName: data.name || '',
+      companyAddress: data.address || '',
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: (error as Error).message || 'Dogrulama hatasi',
+    };
+  }
+}
 
 interface CustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: any;
+  viewMode?: boolean;
   onSave?: () => void;
+  onSuccess?: () => void;
 }
 
 // Ülke listesi - Python ERP ile aynı
@@ -49,10 +89,20 @@ export function CustomerDialog({
   open,
   onOpenChange,
   customer,
+  viewMode = false,
   onSave,
+  onSuccess,
 }: CustomerDialogProps) {
   const isEditMode = !!customer?.id;
   const [loading, setLoading] = useState(false);
+  const [validatingVat, setValidatingVat] = useState(false);
+  const [vatValidationResult, setVatValidationResult] = useState<{
+    valid?: boolean;
+    countryCode?: string;
+    companyName?: string;
+    companyAddress?: string;
+    error?: string;
+  } | null>(null);
 
   // Form state - Python ERP ile aynı alanlar
   const [code, setCode] = useState('');
@@ -137,7 +187,65 @@ export function CustomerDialog({
       setPaymentTerms('30');
       setNotes('');
     }
+    setVatValidationResult(null);
   }, [customer, open]);
+
+  // VIES VAT Validation
+  const handleValidateVat = async () => {
+    if (!vatNumber.trim() || vatNumber.length < 4) {
+      alert('Gecerli bir VAT numarasi giriniz (ornek: SI12345678)');
+      return;
+    }
+
+    setValidatingVat(true);
+    setVatValidationResult(null);
+
+    try {
+      const result = await validateVATNumber(vatNumber.trim());
+      setVatValidationResult(result);
+
+      if (result.valid && result.companyName) {
+        // Auto-fill from VIES data
+        if (!name.trim()) {
+          setName(result.companyName);
+        }
+
+        // Parse address
+        if (result.companyAddress) {
+          const addressLines = result.companyAddress.split('\n').filter(Boolean);
+          if (addressLines.length > 0) {
+            // First line is usually street
+            if (!address.trim()) {
+              setAddress(addressLines[0]);
+            }
+
+            // Try to extract postal code and city from last line
+            const lastLine = addressLines[addressLines.length - 1] || '';
+            const postalMatch = lastLine.match(/\b(\d{4,6})\b/);
+            if (postalMatch && !postalCode.trim()) {
+              setPostalCode(postalMatch[1]);
+              const cityPart = lastLine.replace(postalMatch[0], '').trim().replace(/^,?\s*/, '');
+              if (cityPart && !city.trim()) {
+                setCity(cityPart);
+              }
+            }
+          }
+        }
+
+        // Set country from VAT
+        if (result.countryCode) {
+          setCountry(result.countryCode);
+        }
+
+        // Set type to corporate
+        setType('company');
+      }
+    } catch (error) {
+      setVatValidationResult({ valid: false, error: 'Dogrulama hatasi' });
+    } finally {
+      setValidatingVat(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,38 +266,45 @@ export function CustomerDialog({
           type,
           status,
           customerGroup,
+          vatNumber: vatNumber.trim(),
+          vatValidated: vatValidationResult?.valid || false,
+          vatCountry: vatValidationResult?.countryCode || '',
+          vatCompanyName: vatValidationResult?.companyName || '',
+          vatCheckedAt: vatValidationResult?.valid ? new Date().toISOString() : '',
         },
         contact: {
           email: email.trim(),
           phone: phone.trim(),
           mobile: mobile.trim(),
           website: website.trim(),
-        },
-        addressInfo: {
-          street: address.trim(),
-          city: city.trim(),
-          postalCode: postalCode.trim(),
-          country,
+          address: {
+            street: address.trim(),
+            city: city.trim(),
+            postalCode: postalCode.trim(),
+            country,
+          },
         },
         financial: {
-          vatNumber: vatNumber.trim(),
-          taxNumber: taxNumber.trim(),
+          currency: 'EUR',
           creditLimit: parseFloat(creditLimit) || 0,
+          currentBalance: customer?.financial?.currentBalance || customer?.balance || 0,
           discount: parseFloat(discount) || 0,
           paymentTerms: parseInt(paymentTerms) || 30,
-          balance: customer?.financial?.balance || customer?.balance || 0,
         },
         notes: notes.trim(),
         isActive: true,
+        updatedAt: new Date().toISOString(),
       };
 
       if (isEditMode) {
-        await updateFirestoreData('customers', customer.id, customerData);
+        await updateData(`customers/${customer.id}`, customerData);
       } else {
-        await addFirestoreData('customers', customerData);
+        (customerData as any).createdAt = new Date().toISOString();
+        await pushData('customers', customerData);
       }
 
       onSave?.();
+      onSuccess?.();
       onOpenChange(false);
     } catch (error) {
       console.error('Save error:', error);
@@ -215,6 +330,71 @@ export function CustomerDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* EU VAT Dogrulama Bolumu - En ustte */}
+          <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="text-sm font-medium flex items-center gap-2 text-blue-800">
+              <Shield className="h-4 w-4" />
+              EU VAT Dogrulama (VIES)
+            </h3>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  value={vatNumber}
+                  onChange={(e) => {
+                    setVatNumber(e.target.value.toUpperCase());
+                    setVatValidationResult(null);
+                  }}
+                  placeholder="SI12345678, ATU12345678, DE123456789..."
+                  className="bg-white"
+                  disabled={viewMode}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleValidateVat}
+                disabled={validatingVat || viewMode || !vatNumber.trim()}
+                className="bg-white"
+              >
+                {validatingVat ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Shield className="h-4 w-4 mr-2" />
+                )}
+                VIES Dogrula
+              </Button>
+            </div>
+            {vatValidationResult && (
+              <div className={`p-3 rounded-lg text-sm ${
+                vatValidationResult.valid
+                  ? 'bg-green-100 text-green-800 border border-green-200'
+                  : 'bg-red-100 text-red-800 border border-red-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {vatValidationResult.valid ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  <span className="font-medium">
+                    {vatValidationResult.valid ? 'VAT Numarasi Gecerli' : 'VAT Numarasi Gecersiz'}
+                  </span>
+                </div>
+                {vatValidationResult.companyName && (
+                  <div className="mt-2 text-xs">
+                    <div><strong>Sirket:</strong> {vatValidationResult.companyName}</div>
+                    {vatValidationResult.companyAddress && (
+                      <div><strong>Adres:</strong> {vatValidationResult.companyAddress}</div>
+                    )}
+                  </div>
+                )}
+                {vatValidationResult.error && (
+                  <div className="mt-1 text-xs">{vatValidationResult.error}</div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Temel Bilgiler */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
@@ -403,26 +583,6 @@ export function CustomerDialog({
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="vatNumber">VAT Numarası</Label>
-                <Input
-                  id="vatNumber"
-                  value={vatNumber}
-                  onChange={(e) => setVatNumber(e.target.value)}
-                  placeholder="SI12345678"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="taxNumber">Vergi Numarası</Label>
-                <Input
-                  id="taxNumber"
-                  value={taxNumber}
-                  onChange={(e) => setTaxNumber(e.target.value)}
-                  placeholder="12345678"
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="creditLimit">Kredi Limiti (€)</Label>
                 <Input

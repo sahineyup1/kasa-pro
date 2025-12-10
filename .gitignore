@@ -14,8 +14,8 @@
 /coverage
 
 # next.js
-# /.next/  # cPanel'de build yapılamadığı için dahil ediyoruz
-/out/
+/.next/
+# /out/  # Static export için dahil ediyoruz
 
 # production
 /build

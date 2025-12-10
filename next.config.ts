@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // cPanel/Node.js için standalone output
-  output: 'standalone',
+  // Static export - cPanel için
+  output: 'export',
+  trailingSlash: true,
 
   // Harici bağlantıları kısıtla
   images: {
     remotePatterns: [],
+    unoptimized: true,
   },
 };
 

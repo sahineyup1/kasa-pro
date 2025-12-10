@@ -27,7 +27,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { subscribeToRTDB, updateData, removeData } from '@/services/firebase';
 import { SupplierDialog } from '@/components/dialogs/supplier-dialog';
-import { Plus, RefreshCw, MoreHorizontal, Pencil, Trash2, Eye, Search, Building2, Globe, Phone, Mail } from 'lucide-react';
+import { BulkVIESValidationDialog } from '@/components/dialogs/bulk-vies-validation-dialog';
+import { Plus, RefreshCw, MoreHorizontal, Pencil, Trash2, Eye, Search, Building2, Globe, Phone, Mail, Shield } from 'lucide-react';
 
 // Status badge component
 function StatusBadge({ isActive }: { isActive: boolean }) {
@@ -134,11 +135,12 @@ export default function SuppliersPage() {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [viesDialogOpen, setViesDialogOpen] = useState(false);
 
-  // Load suppliers from RTDB (partners collection)
+  // Load suppliers from RTDB
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = subscribeToRTDB('partners', (data) => {
+    const unsubscribe = subscribeToRTDB('suppliers', (data) => {
       setSuppliers(data || []);
       setLoading(false);
     });
@@ -238,11 +240,11 @@ export default function SuppliersPage() {
 
       // Update based on structure
       if (supplier.basic) {
-        await updateData(`partners/${supplier.id}/basic`, {
+        await updateData(`suppliers/${supplier.id}/basic`, {
           isActive: newStatus,
         });
       } else {
-        await updateData(`partners/${supplier.id}`, {
+        await updateData(`suppliers/${supplier.id}`, {
           isActive: newStatus,
           updatedAt: new Date().toISOString(),
         });
@@ -258,7 +260,7 @@ export default function SuppliersPage() {
     if (!confirm(`"${name}" tedarikciyi silmek istediginize emin misiniz?`)) return;
 
     try {
-      await removeData(`partners/${supplier.id}`);
+      await removeData(`suppliers/${supplier.id}`);
     } catch (error) {
       console.error('Delete error:', error);
       alert('Silme hatasi: ' + (error as Error).message);
@@ -286,6 +288,13 @@ export default function SuppliersPage() {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Yenile
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setViesDialogOpen(true)}
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Toplu VIES Dogrulama
             </Button>
             <Button onClick={handleCreate}>
               <Plus className="h-4 w-4 mr-2" />
@@ -528,6 +537,14 @@ export default function SuppliersPage() {
         onOpenChange={setDialogOpen}
         supplier={selectedSupplier}
         onSave={() => setDialogOpen(false)}
+      />
+
+      {/* Bulk VIES Validation Dialog */}
+      <BulkVIESValidationDialog
+        open={viesDialogOpen}
+        onOpenChange={setViesDialogOpen}
+        entityType="supplier"
+        entities={suppliers}
       />
     </div>
   );
