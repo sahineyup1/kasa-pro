@@ -31,15 +31,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
-import { subscribeToFirestore, deleteFirestoreData } from '@/services/firebase';
+import { subscribeToFirestore, deleteFirestoreData, subscribeToRTDB } from '@/services/firebase';
 import { toast } from 'sonner';
 import {
   Plus, RefreshCw, MoreHorizontal, Search, Download, FileSpreadsheet,
   Wallet, Building2, CreditCard, TrendingUp, TrendingDown, DollarSign,
   ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2, Calculator,
   ChevronRight, PiggyBank, Landmark, Receipt, FileText, AlertCircle,
-  CheckCircle, Clock, Settings, List
+  CheckCircle, Clock, Settings, List, FileDown
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 // Import dialogs
 import {
@@ -201,6 +203,14 @@ export default function FinancePage() {
   const [dateFilter, setDateFilter] = useState('');
   const [creditStatusFilter, setCreditStatusFilter] = useState('all');
 
+  // Export date filters
+  const [exportStartDate, setExportStartDate] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [exportEndDate, setExportEndDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
   // Dialog states - Bank
   const [bankAccountDialogOpen, setBankAccountDialogOpen] = useState(false);
   const [bankTransactionDialogOpen, setBankTransactionDialogOpen] = useState(false);
@@ -236,8 +246,52 @@ export default function FinancePage() {
       setCashRegisters(data || []);
     });
 
+    // Credits - try multiple sources for desktop app compatibility
+    // Firestore: credits, krediler | RTDB: credits, krediler
+    let firestoreCredits: Credit[] = [];
+    let firestoreKrediler: Credit[] = [];
+    let rtdbCredits: Credit[] = [];
+
+    const mapCreditFields = (k: any): Credit => ({
+      ...k,
+      id: k.id || k._id,
+      bankName: k.bankName || k.bankaAdi || k.banka || '',
+      creditType: k.creditType || k.krediTuru || k.tur || '',
+      amount: Number(k.amount || k.tutar || k.miktar || 0),
+      interestRate: Number(k.interestRate || k.faizOrani || k.faiz || 0),
+      term: Number(k.term || k.vade || k.sure || 0),
+      monthlyPayment: Number(k.monthlyPayment || k.aylikTaksit || k.taksit || 0),
+      startDate: k.startDate || k.baslangicTarihi || k.baslangic || '',
+      endDate: k.endDate || k.bitisTarihi || k.bitis || '',
+      paidAmount: Number(k.paidAmount || k.odenenTutar || k.odenen || 0),
+      remainingAmount: Number(k.remainingAmount || k.kalanTutar || k.kalan || k.amount || k.tutar || 0),
+      status: k.status || k.durum || 'active',
+    });
+
+    const updateCredits = () => {
+      // Merge and deduplicate by id
+      const allCredits = [...firestoreCredits, ...firestoreKrediler, ...rtdbCredits];
+      const uniqueCredits = allCredits.reduce((acc: Credit[], curr) => {
+        if (!acc.find(c => c.id === curr.id)) acc.push(curr);
+        return acc;
+      }, []);
+      setCredits(uniqueCredits);
+    };
+
     const unsubCredits = subscribeToFirestore('credits', (data) => {
-      setCredits(data || []);
+      firestoreCredits = (data || []).map(mapCreditFields);
+      updateCredits();
+    });
+
+    const unsubKrediler = subscribeToFirestore('krediler', (data) => {
+      firestoreKrediler = (data || []).map(mapCreditFields);
+      updateCredits();
+    });
+
+    // Also try RTDB
+    const unsubRTDBCredits = subscribeToRTDB('krediler', (data) => {
+      rtdbCredits = (data || []).map(mapCreditFields);
+      updateCredits();
     });
 
     const unsubCreditPayments = subscribeToFirestore('creditPayments', (data) => {
@@ -249,6 +303,8 @@ export default function FinancePage() {
       unsubBankAccounts();
       unsubCashRegisters();
       unsubCredits();
+      unsubKrediler();
+      unsubRTDBCredits();
       unsubCreditPayments();
     };
   }, []);
@@ -394,10 +450,137 @@ export default function FinancePage() {
     }
   };
 
-  // Export to Excel
-  const handleExport = (type: string) => {
-    toast.info(`${type} raporu hazirlaniyor...`);
-    // TODO: Implement actual Excel export
+  // Delete transaction
+  const handleDeleteTransaction = async (tx: Transaction) => {
+    if (!confirm('Bu islemi silmek istediginize emin misiniz?')) return;
+    try {
+      await deleteFirestoreData('transactions', tx.id);
+      toast.success('Islem silindi');
+    } catch (error) {
+      toast.error('Islem silinemedi: ' + (error as Error).message);
+    }
+  };
+
+  // Mali Musavir - Tam Export (Tek dosyada tum veriler)
+  const handleMaliMusavirExport = () => {
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      // Filter transactions by date
+      const filteredTx = transactions.filter(tx => {
+        const txDate = tx.date || tx.createdAt?.split('T')[0] || '';
+        return txDate >= exportStartDate && txDate <= exportEndDate;
+      });
+
+      // 1. Ozet Sayfasi
+      const summaryData = [
+        ['MALI MUSAVIR RAPORU'],
+        ['Rapor Tarihi:', new Date().toLocaleDateString('tr-TR')],
+        ['Donem:', `${exportStartDate} - ${exportEndDate}`],
+        [''],
+        ['HAZINE OZETI'],
+        ['Kasa Bakiyesi:', `€${stats.cashBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        ['Banka Bakiyesi:', `€${stats.bankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        ['Toplam Varlik:', `€${stats.totalAssets.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        ['Kredi Borcu:', `€${stats.totalCreditDebt.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        ['Net Deger:', `€${stats.netWorth.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        [''],
+        ['DONEM OZETI'],
+        ['Toplam Giris:', `€${filteredTx.filter(t => ['income', 'deposit'].includes(t.type || '')).reduce((s, t) => s + (t.amount || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        ['Toplam Cikis:', `€${filteredTx.filter(t => ['expense', 'withdrawal'].includes(t.type || '')).reduce((s, t) => s + (t.amount || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`],
+        ['Islem Sayisi:', filteredTx.length],
+      ];
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Ozet');
+
+      // 2. Tum Islemler
+      const txHeaders = ['Tarih', 'Tip', 'Kategori', 'Aciklama', 'Hesap', 'Tutar', 'Referans'];
+      const txData = filteredTx.map(tx => [
+        tx.date || tx.createdAt?.split('T')[0] || '',
+        tx.type === 'income' ? 'Giris' : tx.type === 'expense' ? 'Cikis' : tx.type === 'deposit' ? 'Yatirma' : tx.type === 'withdrawal' ? 'Cekme' : tx.type || '',
+        tx.category || '',
+        tx.description || '',
+        tx.accountType === 'cash' ? 'Kasa' : tx.accountType === 'bank' ? 'Banka' : tx.accountType || '',
+        tx.amount || 0,
+        tx.reference || ''
+      ]);
+      const txSheet = XLSX.utils.aoa_to_sheet([txHeaders, ...txData]);
+      XLSX.utils.book_append_sheet(workbook, txSheet, 'Islemler');
+
+      // 3. Banka Hesaplari
+      const bankHeaders = ['Hesap Adi', 'Banka', 'IBAN', 'Sube', 'Para Birimi', 'Bakiye', 'Durum'];
+      const bankData = bankAccounts.map(acc => [
+        acc.name || '',
+        acc.bankName || '',
+        acc.iban || '',
+        acc.branch || '',
+        acc.currency || 'EUR',
+        acc.balance || 0,
+        acc.isActive !== false ? 'Aktif' : 'Pasif'
+      ]);
+      const bankSheet = XLSX.utils.aoa_to_sheet([bankHeaders, ...bankData]);
+      XLSX.utils.book_append_sheet(workbook, bankSheet, 'Banka Hesaplari');
+
+      // 4. Krediler
+      const creditHeaders = ['Banka', 'Kredi Turu', 'Toplam', 'Odenen', 'Kalan', 'Faiz %', 'Taksit', 'Vade (Ay)', 'Baslangic', 'Bitis', 'Durum'];
+      const creditData = credits.map(c => [
+        c.bankName || '',
+        c.creditType || '',
+        c.amount || 0,
+        c.paidAmount || 0,
+        c.remainingAmount || 0,
+        c.interestRate || 0,
+        c.monthlyPayment || 0,
+        c.term || 0,
+        c.startDate || '',
+        c.endDate || '',
+        c.status === 'active' ? 'Aktif' : c.status === 'completed' ? 'Tamamlandi' : c.status || ''
+      ]);
+      const creditSheet = XLSX.utils.aoa_to_sheet([creditHeaders, ...creditData]);
+      XLSX.utils.book_append_sheet(workbook, creditSheet, 'Krediler');
+
+      // 5. Kredi Odemeleri
+      const paymentHeaders = ['Kredi', 'Taksit No', 'Vade', 'Odeme Tarihi', 'Tutar', 'Anapara', 'Faiz', 'Durum'];
+      const paymentData = creditPayments.map(p => {
+        const credit = credits.find(c => c.id === p.creditId);
+        return [
+          credit?.bankName || '',
+          p.paymentNumber || '',
+          p.dueDate || '',
+          p.paidDate || '',
+          p.amount || 0,
+          p.principal || 0,
+          p.interest || 0,
+          p.status === 'paid' ? 'Odendi' : p.status === 'pending' ? 'Bekliyor' : p.status || ''
+        ];
+      });
+      const paymentSheet = XLSX.utils.aoa_to_sheet([paymentHeaders, ...paymentData]);
+      XLSX.utils.book_append_sheet(workbook, paymentSheet, 'Kredi Odemeleri');
+
+      // 6. Kasa Kayitlari
+      const cashHeaders = ['Tarih', 'Acilis', 'Kapanis', 'Beklenen', 'Fark', 'Durum', 'Acan', 'Kapatan'];
+      const cashData = cashRegisters.map(r => [
+        r.date || r.openedAt?.split('T')[0] || '',
+        r.openingBalance || 0,
+        r.closingBalance || 0,
+        r.expectedBalance || 0,
+        (r.closingBalance || 0) - (r.expectedBalance || 0),
+        r.status === 'open' ? 'Acik' : 'Kapali',
+        r.openedBy || '',
+        r.closedBy || ''
+      ]);
+      const cashSheet = XLSX.utils.aoa_to_sheet([cashHeaders, ...cashData]);
+      XLSX.utils.book_append_sheet(workbook, cashSheet, 'Kasa Kayitlari');
+
+      // Export
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Mali_Musavir_Raporu_${exportStartDate}_${exportEndDate}.xlsx`);
+
+      toast.success('Mali Musavir raporu indirildi!');
+    } catch (error) {
+      toast.error('Export hatasi: ' + (error as Error).message);
+    }
   };
 
   return (
@@ -1057,7 +1240,7 @@ export default function FinancePage() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" onClick={() => handleExport('transactions')}>
+              <Button variant="outline" onClick={handleMaliMusavirExport}>
                 <Download className="h-4 w-4 mr-2" />
                 Excel
               </Button>
@@ -1118,9 +1301,17 @@ export default function FinancePage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>Detaylar</DropdownMenuItem>
-                              <DropdownMenuItem>Duzenle</DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">Sil</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                toast.info(`Tarih: ${tx.date || tx.createdAt?.split('T')[0]}\nTip: ${tx.type}\nTutar: €${tx.amount}\nAciklama: ${tx.description || '-'}\nKategori: ${tx.category || '-'}\nReferans: ${tx.reference || '-'}`);
+                              }}>
+                                <Eye className="h-4 w-4 mr-2" /> Detaylar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => handleDeleteTransaction(tx)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Sil
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1134,109 +1325,107 @@ export default function FinancePage() {
 
           {/* ==================== EXPORT TAB ==================== */}
           <TabsContent value="export">
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 text-green-600" />
-                Mali Musavir Export
-              </h3>
-
-              <div className="grid grid-cols-3 gap-6">
-                {/* Transactions Export */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Receipt className="h-8 w-8 text-blue-600" />
-                    <div>
-                      <h4 className="font-medium">Islem Raporu</h4>
-                      <p className="text-sm text-gray-500">Tum finansal islemler</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Input type="date" className="flex-1" />
-                      <span>-</span>
-                      <Input type="date" className="flex-1" />
-                    </div>
-                  </div>
-                  <Button className="w-full" onClick={() => handleExport('transactions')}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Excel Indir
-                  </Button>
+            <div className="bg-white rounded-lg border p-8">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                  <FileSpreadsheet className="h-8 w-8 text-green-600" />
                 </div>
+                <h2 className="text-2xl font-bold text-gray-900">Mali Musavir Raporu</h2>
+                <p className="text-gray-500 mt-2">Tum finansal verilerinizi tek bir Excel dosyasinda indirin</p>
+              </div>
 
-                {/* Bank Statements Export */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Building2 className="h-8 w-8 text-blue-600" />
-                    <div>
-                      <h4 className="font-medium">Banka Ekstresi</h4>
-                      <p className="text-sm text-gray-500">Hesap hareketleri</p>
-                    </div>
+              {/* Date Selection */}
+              <div className="max-w-xl mx-auto mb-8">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rapor Donemi</label>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Baslangic</label>
+                    <Input
+                      type="date"
+                      value={exportStartDate}
+                      onChange={(e) => setExportStartDate(e.target.value)}
+                    />
                   </div>
-                  <div className="space-y-2 mb-4">
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Hesap sec" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tum Hesaplar</SelectItem>
-                        {bankAccounts.map(acc => (
-                          <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <span className="text-gray-400 mt-5">—</span>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Bitis</label>
+                    <Input
+                      type="date"
+                      value={exportEndDate}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                    />
                   </div>
-                  <Button className="w-full" variant="outline" onClick={() => handleExport('bank')}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Excel Indir
-                  </Button>
-                </div>
-
-                {/* Credits Export */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <CreditCard className="h-8 w-8 text-red-600" />
-                    <div>
-                      <h4 className="font-medium">Kredi Raporu</h4>
-                      <p className="text-sm text-gray-500">Kredi ve taksit detaylari</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kredi sec" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tum Krediler</SelectItem>
-                        {credits.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.bankName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="w-full" variant="outline" onClick={() => handleExport('credits')}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Excel Indir
-                  </Button>
                 </div>
               </div>
 
-              {/* Full Export */}
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-purple-600" />
-                    <div>
-                      <h4 className="font-medium">Tam Finansal Rapor</h4>
-                      <p className="text-sm text-gray-500">
-                        Kasa, banka, kredi - tum veriler tek dosyada
-                      </p>
-                    </div>
+              {/* What's Included */}
+              <div className="max-w-2xl mx-auto mb-8">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Rapor Icerigi (6 Sayfa)</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm">Ozet - Hazine durumu ve donem ozeti</span>
                   </div>
-                  <Button onClick={() => handleExport('full')}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Tam Rapor Indir
-                  </Button>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm">Islemler - Tum finansal hareketler</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm">Banka Hesaplari - Hesap detaylari</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm">Krediler - Kredi bilgileri</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm">Kredi Odemeleri - Taksit detaylari</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm">Kasa Kayitlari - Acilis/kapanis</span>
+                  </div>
                 </div>
+              </div>
+
+              {/* Current Summary */}
+              <div className="max-w-2xl mx-auto mb-8 p-4 bg-blue-50 rounded-lg">
+                <h3 className="text-sm font-medium text-blue-900 mb-3">Mevcut Veriler</h3>
+                <div className="grid grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold text-blue-600">{transactions.length}</p>
+                    <p className="text-xs text-blue-700">Islem</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-600">{bankAccounts.length}</p>
+                    <p className="text-xs text-blue-700">Banka Hesabi</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-600">{credits.length}</p>
+                    <p className="text-xs text-blue-700">Kredi</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-600">{cashRegisters.length}</p>
+                    <p className="text-xs text-blue-700">Kasa Kaydi</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Download Button */}
+              <div className="text-center">
+                <Button
+                  size="lg"
+                  className="px-12 py-6 text-lg bg-green-600 hover:bg-green-700"
+                  onClick={handleMaliMusavirExport}
+                >
+                  <FileDown className="h-6 w-6 mr-3" />
+                  Mali Musavir Raporunu Indir
+                </Button>
+                <p className="text-xs text-gray-400 mt-3">
+                  Excel formatinda (.xlsx) indirilecektir
+                </p>
               </div>
             </div>
           </TabsContent>
