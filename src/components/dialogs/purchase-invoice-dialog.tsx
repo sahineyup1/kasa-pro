@@ -46,6 +46,11 @@ const PAYMENT_STATUSES = [
   { value: 'paid', label: 'Odendi' },
 ];
 
+// Sabit Şube Listesi - Alış sadece MERKEZ'e yapılır!
+const BRANCHES = [
+  { id: 'merkez', name: 'Merkez Depo', icon: '🏭' },
+];
+
 interface Supplier {
   id: string;
   name: string;
@@ -82,7 +87,7 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [branchId, setBranchId] = useState('');
+  const [branchId, setBranchId] = useState('merkez'); // Alış sadece Merkez'e
   const [supplierId, setSupplierId] = useState('');
   const [supplierDdvNo, setSupplierDdvNo] = useState('');
   const [status, setStatus] = useState('pending');
@@ -133,7 +138,7 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
         setInvoiceNo(invoice.invoiceNo || invoice.invoice_number || '');
         setInvoiceDate(invoice.date || invoice.invoice_date || today);
         setDueDate(invoice.dueDate || invoice.due_date || thirtyDaysLater);
-        setBranchId(invoice.branchId || invoice.branch_id || '');
+        setBranchId(invoice.branchId || invoice.branch_id || 'merkez');
         setSupplierId(invoice.supplierId || invoice.supplier_id || '');
         setSupplierDdvNo(invoice.supplierDdvNo || '');
         setStatus(invoice.status || 'pending');
@@ -313,20 +318,23 @@ export function PurchaseInvoiceDialog({ open, onOpenChange, invoice, onSave }: P
             </h3>
             <div className="grid grid-cols-5 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="branchId">Sube *</Label>
+                <Label htmlFor="branchId" className="flex items-center gap-1">
+                  <Store className="h-4 w-4" />
+                  Hedef Depo
+                </Label>
                 <Select value={branchId} onValueChange={setBranchId}>
                   <SelectTrigger>
-                    <Store className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Sube secin" />
+                    <SelectValue placeholder="Depo secin" />
                   </SelectTrigger>
                   <SelectContent>
-                    {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
+                    {BRANCHES.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
+                        {branch.icon} {branch.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">Tum alislar Merkez Depo'ya yapilir</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="invoiceNo">Fatura No *</Label>

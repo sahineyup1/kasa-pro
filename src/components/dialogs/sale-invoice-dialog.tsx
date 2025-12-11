@@ -20,7 +20,15 @@ import {
 import { useState, useEffect } from 'react';
 import { addFirestoreData, updateFirestoreData } from '@/services/firebase';
 import { toast } from 'sonner';
-import { Receipt, Save, X, Loader2 } from 'lucide-react';
+import { Receipt, Save, X, Loader2, Store } from 'lucide-react';
+
+// Sabit Şube Listesi
+const BRANCHES = [
+  { id: 'merkez', name: 'Merkez Depo', icon: '🏭' },
+  { id: 'balkan', name: 'Balkan Market', icon: '🛒' },
+  { id: 'desetka', name: 'Desetka Market', icon: '🛒' },
+  { id: 'mesnica', name: 'Mesnica Kasap', icon: '🥩' },
+];
 
 interface SaleInvoice {
   id?: string;
@@ -29,8 +37,10 @@ interface SaleInvoice {
   customerName?: string;
   customerId?: string;
   branchId?: string;
+  branchName?: string;
   items?: any[];
   subtotal?: number;
+  vatAmount?: number;
   total?: number;
   paymentMethod?: string;
   status?: string;
@@ -119,19 +129,28 @@ export function SaleInvoiceDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Sube</Label>
+              <Label className="flex items-center gap-1">
+                <Store className="h-4 w-4" />
+                Sube *
+              </Label>
               <Select
-                value={formData.branchId || 'none'}
-                onValueChange={(value) => setFormData({ ...formData, branchId: value === 'none' ? '' : value })}
+                value={formData.branchId || ''}
+                onValueChange={(value) => {
+                  const branch = BRANCHES.find(b => b.id === value);
+                  setFormData({
+                    ...formData,
+                    branchId: value,
+                    branchName: branch?.name || ''
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sube secin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">-- Sube secin --</SelectItem>
-                  {branches.filter(b => b.id).map((branch) => (
+                  {BRANCHES.map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name || branch.id}
+                      {branch.icon} {branch.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

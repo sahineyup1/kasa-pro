@@ -101,6 +101,11 @@ const paymentStatusLabels: Record<string, { label: string; color: string }> = {
   paid: { label: 'Ödendi', color: 'bg-emerald-100 text-emerald-700' },
 };
 
+// Sabit Şube - Alışlar sadece Merkez Depo'ya yapılır
+const BRANCHES: Record<string, { name: string; icon: string; color: string }> = {
+  merkez: { name: 'Merkez Depo', icon: '🏭', color: 'bg-blue-100 text-blue-700' },
+};
+
 export default function PurchaseInvoicesPage() {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);

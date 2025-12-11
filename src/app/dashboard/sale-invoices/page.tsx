@@ -106,6 +106,14 @@ const paymentMethodLabels: Record<string, { label: string; icon: any }> = {
   bank_transfer: { label: 'Havale/EFT', icon: Building2 },
 };
 
+// Sabit Şube Listesi
+const BRANCHES: Record<string, { name: string; icon: string; color: string }> = {
+  merkez: { name: 'Merkez Depo', icon: '🏭', color: 'bg-blue-100 text-blue-700' },
+  balkan: { name: 'Balkan Market', icon: '🛒', color: 'bg-green-100 text-green-700' },
+  desetka: { name: 'Desetka Market', icon: '🛒', color: 'bg-emerald-100 text-emerald-700' },
+  mesnica: { name: 'Mesnica Kasap', icon: '🥩', color: 'bg-red-100 text-red-700' },
+};
+
 export default function SaleInvoicesPage() {
   const [invoices, setInvoices] = useState<SaleInvoice[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -203,11 +211,24 @@ export default function SaleInvoicesPage() {
     setTimeout(() => setLoading(false), 500);
   };
 
-  const getBranchName = (branchId?: string) => {
-    if (!branchId) return '-';
-    const branch = branches.find(b => b.id === branchId);
-    return branch?.name || branchId;
+  const getBranchInfo = (branchId?: string) => {
+    if (!branchId) return { name: '-', icon: '', color: 'bg-gray-100 text-gray-700' };
+    return BRANCHES[branchId] || { name: branchId, icon: '', color: 'bg-gray-100 text-gray-700' };
   };
+
+  // Şube bazlı satış özeti
+  const branchStats = useMemo(() => {
+    return Object.entries(BRANCHES).map(([branchId, branchInfo]) => {
+      const branchInvoices = invoices.filter((i) => i.branchId === branchId);
+      return {
+        branchId,
+        ...branchInfo,
+        count: branchInvoices.length,
+        total: branchInvoices.reduce((sum, i) => sum + (i.total || 0), 0),
+        vatAmount: branchInvoices.reduce((sum, i) => sum + (i.vatAmount || i.totalTax || 0), 0),
+      };
+    });
+  }, [invoices]);
 
   if (loading) {
     return (
@@ -301,6 +322,52 @@ export default function SaleInvoicesPage() {
         </Card>
       </div>
 
+      {/* Şube Bazlı Satış Özeti */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Sube Bazli Satis Ozeti
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {branchStats.map((branch) => (
+              <button
+                key={branch.branchId}
+                onClick={() => setSelectedBranch(branch.branchId)}
+                className={`p-3 rounded-lg border text-left transition-all hover:shadow-md ${
+                  selectedBranch === branch.branchId
+                    ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                    : 'border-muted hover:border-primary/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">{branch.icon}</span>
+                  <span className="text-xs font-medium truncate">{branch.name}</span>
+                </div>
+                <div className="text-lg font-bold text-primary">
+                  {formatCurrency(branch.total)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {branch.count} fatura • KDV: {formatCurrency(branch.vatAmount)}
+                </div>
+              </button>
+            ))}
+          </div>
+          {selectedBranch !== 'all' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-3"
+              onClick={() => setSelectedBranch('all')}
+            >
+              Filtreyi Temizle
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -324,9 +391,9 @@ export default function SaleInvoicesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tum Subeler</SelectItem>
-                  {branches.filter(b => b.id && b.isActive !== false).map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
+                  {Object.entries(BRANCHES).map(([key, { name, icon }]) => (
+                    <SelectItem key={key} value={key}>
+                      {icon} {name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -402,9 +469,13 @@ export default function SaleInvoicesPage() {
                         {invoice.customer?.name || invoice.customerName || '-'}
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs text-muted-foreground">
-                          {getBranchName(invoice.branchId)}
-                        </span>
+                        {invoice.branchId ? (
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getBranchInfo(invoice.branchId).color}`}>
+                            {getBranchInfo(invoice.branchId).icon} {getBranchInfo(invoice.branchId).name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(invoice.subtotal || 0)}
