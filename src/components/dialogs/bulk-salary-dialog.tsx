@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -290,12 +290,12 @@ export function BulkSalaryDialog({ open, onOpenChange, employees }: BulkSalaryDi
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="bg-blue-600 -m-6 mb-0 p-6 rounded-t-lg">
+        <DialogHeader className="bg-amber-600 -m-6 mb-0 p-6 rounded-t-lg">
           <DialogTitle className="flex items-center gap-2 text-white text-xl">
             <Building2 className="h-6 w-6" />
             Toplu Banka Maaş Odemesi
           </DialogTitle>
-          <DialogDescription className="text-blue-100">
+          <DialogDescription className="text-amber-100">
             {currentMonthLabel} - Sadece resmi (banka) maaslari
           </DialogDescription>
         </DialogHeader>
@@ -349,7 +349,7 @@ export function BulkSalaryDialog({ open, onOpenChange, employees }: BulkSalaryDi
                 emp.isPaid
                   ? 'border-green-200 bg-green-50'
                   : emp.selected
-                  ? 'border-blue-300 bg-white'
+                  ? 'border-amber-300 bg-white'
                   : 'border-gray-200 bg-gray-50 opacity-60'
               }`}
             >
@@ -406,12 +406,12 @@ export function BulkSalaryDialog({ open, onOpenChange, employees }: BulkSalaryDi
                         <span className="text-sm text-gray-400 line-through mr-2">
                           {formatCurrency(emp.bankSalary)}
                         </span>
-                        <span className="font-semibold text-blue-600">
+                        <span className="font-semibold text-amber-600">
                           {formatCurrency(emp.netBankSalary)}
                         </span>
                       </div>
                     ) : (
-                      <div className="font-semibold text-blue-600">
+                      <div className="font-semibold text-amber-600">
                         {formatCurrency(emp.bankSalary)}
                       </div>
                     )}
@@ -458,7 +458,7 @@ export function BulkSalaryDialog({ open, onOpenChange, employees }: BulkSalaryDi
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <div className="text-sm text-gray-500">Toplam Banka Odemesi</div>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-bold text-amber-600">
                   {formatCurrency(totals.bankTotal)}
                 </div>
               </div>
@@ -469,7 +469,7 @@ export function BulkSalaryDialog({ open, onOpenChange, employees }: BulkSalaryDi
               <Button
                 onClick={handleProcessPayments}
                 disabled={loading || totals.selectedCount === 0}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-amber-700"
               >
                 <Building2 className="h-4 w-4 mr-2" />
                 {loading ? 'Isleniyor...' : 'Banka Odemelerini Yap'}

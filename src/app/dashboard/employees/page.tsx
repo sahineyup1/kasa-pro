@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -486,10 +486,10 @@ export default function EmployeesPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-lg p-4">
+          <div className="bg-amber-50 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Users className="h-5 w-5 text-amber-600" />
               </div>
               <div>
                 <p className="text-sm text-gray-600">Toplam Personel</p>
@@ -636,7 +636,7 @@ export default function EmployeesPage() {
                     <TableRow key={employee.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">
+                          <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 font-medium">
                             {firstName.charAt(0)}{lastName.charAt(0)}
                           </div>
                           <div>

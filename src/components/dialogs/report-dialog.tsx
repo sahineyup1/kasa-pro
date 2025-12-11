@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ function KPICard({
   changeType?: 'up' | 'down';
 }) {
   const colorClasses = {
-    blue: 'border-l-blue-500 bg-blue-50',
+    blue: 'border-l-amber-500 bg-amber-50',
     green: 'border-l-green-500 bg-green-50',
     red: 'border-l-red-500 bg-red-50',
     amber: 'border-l-amber-500 bg-amber-50',
@@ -70,7 +70,7 @@ function KPICard({
   };
 
   const textColors = {
-    blue: 'text-blue-600',
+    blue: 'text-amber-600',
     green: 'text-green-600',
     red: 'text-red-600',
     amber: 'text-amber-600',
@@ -815,7 +815,7 @@ export function ReportDialog({ open, onOpenChange, reportType = 'stock' }: Repor
                 <KPICard
                   title="Toplam Urun"
                   value={stats.totalProducts.toString()}
-                  icon={<Package className="h-5 w-5 text-blue-600" />}
+                  icon={<Package className="h-5 w-5 text-amber-600" />}
                   color="blue"
                 />
                 <KPICard
@@ -848,7 +848,7 @@ export function ReportDialog({ open, onOpenChange, reportType = 'stock' }: Repor
                 <KPICard
                   title="Devir Hizi"
                   value={`${stats.turnoverRate}x`}
-                  icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
+                  icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
                   color="blue"
                 />
               </div>
@@ -1057,7 +1057,7 @@ export function ReportDialog({ open, onOpenChange, reportType = 'stock' }: Repor
                 <KPICard
                   title="Ort. Birim Maliyet"
                   value={`€${valuationData.avgUnitCost.toFixed(2)}`}
-                  icon={<DollarSign className="h-5 w-5 text-blue-600" />}
+                  icon={<DollarSign className="h-5 w-5 text-amber-600" />}
                   color="blue"
                 />
                 <KPICard
@@ -1120,7 +1120,7 @@ export function ReportDialog({ open, onOpenChange, reportType = 'stock' }: Repor
                 <KPICard
                   title="Siparis Onerisi"
                   value={`${lowStockData.items.length} urun`}
-                  icon={<Package className="h-5 w-5 text-blue-600" />}
+                  icon={<Package className="h-5 w-5 text-amber-600" />}
                   color="blue"
                 />
               </div>
@@ -1215,8 +1215,8 @@ export function ReportDialog({ open, onOpenChange, reportType = 'stock' }: Repor
 
             {/* =================== ABC ANALYSIS TAB =================== */}
             <TabsContent value="abc" className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">ABC Analizi - Deger Bazli Siniflandirma</h4>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-800 mb-2">ABC Analizi - Deger Bazli Siniflandirma</h4>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <ABCBadge abcClass="A" />

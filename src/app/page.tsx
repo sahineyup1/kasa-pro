@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -116,7 +116,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-white to-indigo-50 p-4">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5" />
 
@@ -239,8 +239,8 @@ export default function LoginPage() {
         </Card>
 
         {/* Security Notice */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          <p className="text-xs text-blue-600 text-center">
+        <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-100">
+          <p className="text-xs text-amber-600 text-center">
             <Shield className="w-3 h-3 inline mr-1" />
             Bu sistem yetkili kullanicilara ozeldir. Tum girisler kayit altina alinmaktadir.
           </p>

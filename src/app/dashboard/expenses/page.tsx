@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -65,7 +65,9 @@ import {
   addFirestoreData,
   updateFirestoreData,
   subscribeToRTDB,
-  subscribeToBranches
+  subscribeToBranches,
+  pushData,
+  updateData
 } from '@/services/firebase';
 import { ExpenseDialog } from '@/components/dialogs/expense-dialog';
 import { toast } from 'sonner';
@@ -137,7 +139,7 @@ interface Branch {
 // ==================== CONSTANTS ====================
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string; color: string }> = {
   fuel: { label: 'Yakit', icon: '⛽', color: 'bg-orange-100 text-orange-700' },
-  maintenance: { label: 'Bakim/Onarim', icon: '🔧', color: 'bg-blue-100 text-blue-700' },
+  maintenance: { label: 'Bakim/Onarim', icon: '🔧', color: 'bg-amber-100 text-amber-700' },
   insurance: { label: 'Sigorta', icon: '🛡️', color: 'bg-purple-100 text-purple-700' },
   rent: { label: 'Kira', icon: '🏠', color: 'bg-green-100 text-green-700' },
   utilities: { label: 'Faturalar', icon: '💡', color: 'bg-yellow-100 text-yellow-700' },
@@ -157,7 +159,7 @@ const PAYMENT_METHODS: Record<string, string> = {
 
 const PAYMENT_STATUSES: Record<string, { label: string; color: string }> = {
   pending: { label: 'Bekliyor', color: 'bg-yellow-100 text-yellow-700' },
-  partial: { label: 'Kismi', color: 'bg-blue-100 text-blue-700' },
+  partial: { label: 'Kismi', color: 'bg-amber-100 text-amber-700' },
   paid: { label: 'Odendi', color: 'bg-emerald-100 text-emerald-700' },
   overdue: { label: 'Vadesi Gecti', color: 'bg-red-100 text-red-700' },
   cancelled: { label: 'Iptal', color: 'bg-gray-100 text-gray-700' },
@@ -189,8 +191,14 @@ export default function ExpensesPage() {
 
   // Load data
   useEffect(() => {
+    console.log('ExpensesPage: Subscribing to erp_expenses collection...');
+
     // Masraf fisleri
     const unsubExpenses = subscribeToFirestore('expenses', (data) => {
+      console.log('ExpensesPage: Received expenses data:', data?.length || 0, 'items');
+      if (data?.length > 0) {
+        console.log('ExpensesPage: First expense:', data[0]);
+      }
       const activeExpenses = data
         .filter((e: Expense) => e.isActive !== false)
         .sort((a: Expense, b: Expense) => {
@@ -198,6 +206,7 @@ export default function ExpensesPage() {
           const dateB = b.documentDate || b.date || '';
           return dateB.localeCompare(dateA);
         });
+      console.log('ExpensesPage: Active expenses:', activeExpenses.length);
       setExpenses(activeExpenses);
       setLoading(false);
     });
@@ -1312,11 +1321,12 @@ function VendorDialog({
       };
 
       if (vendor) {
-        // Update - RTDB kullan
-        toast.info('Guncelleme islemi yakildi');
+        // Update existing vendor in RTDB
+        await updateData(`expense_vendors/${vendor.id}`, data);
+        toast.success('Masraf carisi guncellendi');
       } else {
-        // Create
-        await addFirestoreData('expense_vendors', {
+        // Create new vendor in RTDB
+        await pushData('expense_vendors', {
           ...data,
           createdAt: new Date().toISOString(),
         });
@@ -1325,6 +1335,7 @@ function VendorDialog({
 
       onOpenChange(false);
     } catch (error) {
+      console.error('Vendor save error:', error);
       toast.error('Hata: ' + (error as Error).message);
     } finally {
       setLoading(false);

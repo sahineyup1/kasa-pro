@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -256,7 +256,7 @@ export default function ReportsPage() {
             <StatCard
               title="Urun Sayisi"
               value={stats.productCount.toString()}
-              icon={<Package className="h-5 w-5 text-blue-600" />}
+              icon={<Package className="h-5 w-5 text-amber-600" />}
             />
             <StatCard
               title="Dusuk Stok"
@@ -281,8 +281,8 @@ export default function ReportsPage() {
             <ReportCard
               title="Aylik Satis Raporu"
               description="Aylik satis analizi ve karsilastirma"
-              icon={<BarChart3 className="h-6 w-6 text-blue-600" />}
-              color="bg-blue-100"
+              icon={<BarChart3 className="h-6 w-6 text-amber-600" />}
+              color="bg-amber-100"
               onClick={() => handleGenerateReport('Aylik Satis')}
             />
             <ReportCard
@@ -308,8 +308,8 @@ export default function ReportsPage() {
             <ReportCard
               title="Banka Raporu"
               description="Banka hareketleri ve mutabakat"
-              icon={<Building2 className="h-6 w-6 text-blue-600" />}
-              color="bg-blue-100"
+              icon={<Building2 className="h-6 w-6 text-amber-600" />}
+              color="bg-amber-100"
               onClick={() => handleGenerateReport('Banka')}
             />
             <ReportCard
@@ -328,8 +328,8 @@ export default function ReportsPage() {
             <ReportCard
               title="Stok Durumu"
               description="Mevcut stok seviyeleri ve degerler"
-              icon={<Package className="h-6 w-6 text-blue-600" />}
-              color="bg-blue-100"
+              icon={<Package className="h-6 w-6 text-amber-600" />}
+              color="bg-amber-100"
               onClick={() => handleGenerateReport('Stok Durumu')}
             />
             <ReportCard

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -96,7 +96,7 @@ interface Branch {
 const statusLabels: Record<string, { label: string; color: string; icon: any }> = {
   paid: { label: 'Odendi', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   pending: { label: 'Beklemede', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-  partial: { label: 'Kismi Odeme', color: 'bg-blue-100 text-blue-700', icon: Clock },
+  partial: { label: 'Kismi Odeme', color: 'bg-amber-100 text-amber-700', icon: Clock },
   cancelled: { label: 'Iptal', color: 'bg-red-100 text-red-700', icon: XCircle },
 };
 

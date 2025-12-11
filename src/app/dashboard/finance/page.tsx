@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -185,7 +185,7 @@ function TransactionTypeBadge({ type }: { type: string }) {
   const styles: Record<string, string> = {
     'income': 'bg-green-100 text-green-800',
     'expense': 'bg-red-100 text-red-800',
-    'transfer': 'bg-blue-100 text-blue-800',
+    'transfer': 'bg-amber-100 text-amber-800',
     'deposit': 'bg-green-100 text-green-800',
     'withdrawal': 'bg-red-100 text-red-800',
   };
@@ -209,7 +209,7 @@ function TransactionTypeBadge({ type }: { type: string }) {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     'active': 'bg-green-100 text-green-800',
-    'completed': 'bg-blue-100 text-blue-800',
+    'completed': 'bg-amber-100 text-amber-800',
     'defaulted': 'bg-red-100 text-red-800',
     'pending': 'bg-yellow-100 text-yellow-800',
     'paid': 'bg-green-100 text-green-800',
@@ -756,14 +756,14 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border-l-4 border-l-blue-500 p-4">
+              <div className="bg-white rounded-lg border-l-4 border-l-amber-500 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <Building2 className="h-5 w-5 text-amber-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Banka</p>
-                    <p className="text-xl font-semibold text-blue-600">
+                    <p className="text-xl font-semibold text-amber-600">
                       €{stats.bankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -819,7 +819,7 @@ export default function FinancePage() {
               <div className="bg-white rounded-lg border">
                 <div className="p-4 border-b flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                    <Building2 className="h-5 w-5 text-amber-600" />
                     Banka Hesaplari
                   </h3>
                   <Button
@@ -841,7 +841,7 @@ export default function FinancePage() {
                             <p className="font-medium">{account.name}</p>
                             <p className="text-sm text-gray-500">{account.bankName}</p>
                           </div>
-                          <p className="font-semibold text-blue-600">
+                          <p className="font-semibold text-amber-600">
                             €{(account.balance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
@@ -909,8 +909,8 @@ export default function FinancePage() {
                     €{stats.todayExpense.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <DollarSign className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                <div className="text-center p-4 bg-amber-50 rounded-lg">
+                  <DollarSign className="h-8 w-8 text-amber-600 mx-auto mb-2" />
                   <p className="text-sm text-gray-600">Net</p>
                   <p className={`text-2xl font-bold ${(stats.todayIncome - stats.todayExpense) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     €{(stats.todayIncome - stats.todayExpense).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
@@ -962,14 +962,14 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border-l-4 border-l-blue-500 p-4">
+              <div className="bg-white rounded-lg border-l-4 border-l-amber-500 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <Building2 className="h-5 w-5 text-amber-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Toplam Banka</p>
-                    <p className="text-xl font-semibold text-blue-600">
+                    <p className="text-xl font-semibold text-amber-600">
                       €{branchStats.totalBranchBankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -1055,7 +1055,7 @@ export default function FinancePage() {
                             {/* Banka Bakiyesi */}
                             <div className="text-right">
                               <p className="text-xs text-gray-500">Banka ({bankAccountsArray.length})</p>
-                              <p className={`text-lg font-semibold ${totalBankBalance > 0 ? 'text-blue-600' : 'text-gray-600'}`}>
+                              <p className={`text-lg font-semibold ${totalBankBalance > 0 ? 'text-amber-600' : 'text-gray-600'}`}>
                                 €{totalBankBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                               </p>
                             </div>
@@ -1083,7 +1083,7 @@ export default function FinancePage() {
                                   <div
                                     key={acc.id}
                                     className={`p-2 rounded-lg text-sm ${
-                                      isCredit ? 'bg-red-50' : 'bg-blue-50'
+                                      isCredit ? 'bg-red-50' : 'bg-amber-50'
                                     }`}
                                   >
                                     <p className="font-medium truncate">{acc.accountName || acc.bankName}</p>
@@ -1092,7 +1092,7 @@ export default function FinancePage() {
                                       isCredit
                                         ? 'text-red-600'
                                         : balance >= 0
-                                          ? 'text-blue-600'
+                                          ? 'text-amber-600'
                                           : 'text-red-600'
                                     }`}>
                                       {acc.currency || 'EUR'} {balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
@@ -1294,7 +1294,7 @@ export default function FinancePage() {
                           <div className="flex items-center gap-2">
                             <Store className="h-4 w-4" />
                             {branch.name}
-                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
                               {accountCount} hesap
                             </span>
                           </div>
@@ -1329,8 +1329,8 @@ export default function FinancePage() {
                   <div className="bg-white rounded-lg border mb-6 p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="p-4 rounded-full bg-blue-100">
-                          <Building2 className="h-8 w-8 text-blue-600" />
+                        <div className="p-4 rounded-full bg-amber-100">
+                          <Building2 className="h-8 w-8 text-amber-600" />
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold">{branch.name} - Banka Hesaplari</h3>
@@ -1339,7 +1339,7 @@ export default function FinancePage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-500">Toplam Bakiye</p>
-                        <p className={`text-3xl font-bold ${totalBalance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        <p className={`text-3xl font-bold ${totalBalance >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
                           €{totalBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
@@ -1360,7 +1360,7 @@ export default function FinancePage() {
                               <p className="text-sm text-gray-500">{account.bankName}</p>
                               {account.accountType && (
                                 <span className={`text-xs px-2 py-0.5 rounded mt-1 inline-block ${
-                                  isCredit ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                                  isCredit ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
                                 }`}>
                                   {account.accountType === 'checking' ? 'Vadesiz' :
                                    account.accountType === 'savings' ? 'Vadeli' :
@@ -1378,7 +1378,7 @@ export default function FinancePage() {
                           )}
 
                           <p className={`text-2xl font-bold ${
-                            isCredit ? 'text-red-600' : balance >= 0 ? 'text-blue-600' : 'text-red-600'
+                            isCredit ? 'text-red-600' : balance >= 0 ? 'text-amber-600' : 'text-red-600'
                           }`}>
                             {account.currency || 'EUR'} {balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </p>
@@ -1780,24 +1780,24 @@ export default function FinancePage() {
               </div>
 
               {/* Current Summary */}
-              <div className="max-w-2xl mx-auto mb-8 p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-sm font-medium text-blue-900 mb-3">Mevcut Veriler</h3>
+              <div className="max-w-2xl mx-auto mb-8 p-4 bg-amber-50 rounded-lg">
+                <h3 className="text-sm font-medium text-amber-900 mb-3">Mevcut Veriler</h3>
                 <div className="grid grid-cols-4 gap-4 text-center">
                   <div>
-                    <p className="text-2xl font-bold text-blue-600">{transactions.length}</p>
-                    <p className="text-xs text-blue-700">Islem</p>
+                    <p className="text-2xl font-bold text-amber-600">{transactions.length}</p>
+                    <p className="text-xs text-amber-700">Islem</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-blue-600">{bankAccounts.length}</p>
-                    <p className="text-xs text-blue-700">Banka Hesabi</p>
+                    <p className="text-2xl font-bold text-amber-600">{bankAccounts.length}</p>
+                    <p className="text-xs text-amber-700">Banka Hesabi</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-blue-600">{credits.length}</p>
-                    <p className="text-xs text-blue-700">Kredi</p>
+                    <p className="text-2xl font-bold text-amber-600">{credits.length}</p>
+                    <p className="text-xs text-amber-700">Kredi</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-blue-600">{cashRegisters.length}</p>
-                    <p className="text-xs text-blue-700">Kasa Kaydi</p>
+                    <p className="text-2xl font-bold text-amber-600">{cashRegisters.length}</p>
+                    <p className="text-xs text-amber-700">Kasa Kaydi</p>
                   </div>
                 </div>
               </div>

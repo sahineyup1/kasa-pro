@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -418,7 +418,7 @@ export function CreditDetailDialog({ open, onOpenChange, credit, payments }: Cre
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       active: 'bg-green-100 text-green-800',
-      completed: 'bg-blue-100 text-blue-800',
+      completed: 'bg-amber-100 text-amber-800',
       defaulted: 'bg-red-100 text-red-800',
     };
     const labels: Record<string, string> = {
@@ -473,9 +473,9 @@ export function CreditDetailDialog({ open, onOpenChange, credit, payments }: Cre
                 {credit.currency} {(credit.remainingAmount || 0).toLocaleString('tr-TR')}
               </p>
             </div>
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-amber-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">Aylik Taksit</p>
-              <p className="text-xl font-semibold text-blue-600">
+              <p className="text-xl font-semibold text-amber-600">
                 {credit.currency} {(credit.monthlyPayment || 0).toLocaleString('tr-TR')}
               </p>
             </div>
@@ -702,7 +702,7 @@ export function CreditPaymentDialog({ open, onOpenChange, credit, bankAccounts }
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="bg-amber-50 p-4 rounded-lg">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">Kalan Borc:</span>

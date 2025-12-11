@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -283,7 +283,7 @@ export function LeaveDialog({ open, onOpenChange, employees }: LeaveDialogProps)
           <button
             className={`px-4 py-2 font-medium ${
               activeTab === 'new'
-                ? 'border-b-2 border-blue-600 text-blue-600'
+                ? 'border-b-2 border-amber-600 text-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
             onClick={() => setActiveTab('new')}
@@ -294,7 +294,7 @@ export function LeaveDialog({ open, onOpenChange, employees }: LeaveDialogProps)
           <button
             className={`px-4 py-2 font-medium ${
               activeTab === 'list'
-                ? 'border-b-2 border-blue-600 text-blue-600'
+                ? 'border-b-2 border-amber-600 text-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
             onClick={() => setActiveTab('list')}
@@ -340,7 +340,7 @@ export function LeaveDialog({ open, onOpenChange, employees }: LeaveDialogProps)
                       key={type.id}
                       className={`flex items-start p-3 border rounded-lg cursor-pointer transition-colors ${
                         leaveType === type.id
-                          ? 'border-blue-500 bg-blue-50'
+                          ? 'border-amber-500 bg-amber-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
@@ -384,7 +384,7 @@ export function LeaveDialog({ open, onOpenChange, employees }: LeaveDialogProps)
               {/* Days badge */}
               {days > 0 && (
                 <div className="flex justify-center">
-                  <span className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">
+                  <span className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium">
                     {days} gun
                   </span>
                 </div>
@@ -405,8 +405,8 @@ export function LeaveDialog({ open, onOpenChange, employees }: LeaveDialogProps)
               </div>
 
               {/* Calculation summary */}
-              <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                <h4 className="font-medium text-blue-800 mb-3 flex items-center gap-2">
+              <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-lg">
+                <h4 className="font-medium text-amber-800 mb-3 flex items-center gap-2">
                   <Calculator className="h-4 w-4" />
                   Maas Hesaplamasi
                 </h4>
@@ -418,7 +418,7 @@ export function LeaveDialog({ open, onOpenChange, employees }: LeaveDialogProps)
                       <p>Izin gunu: {days} gun</p>
                       <p>{details}</p>
                     </div>
-                    <div className={`text-lg font-bold pt-3 border-t border-blue-200 ${
+                    <div className={`text-lg font-bold pt-3 border-t border-amber-200 ${
                       deduction > 0 ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {deduction > 0

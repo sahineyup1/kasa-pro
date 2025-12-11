@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -359,7 +359,7 @@ export default function VehiclesPage() {
             <Wrench className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-amber-600">
               {formatCurrency(stats.totalMaintenance)}
             </div>
           </CardContent>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -426,7 +426,7 @@ export default function DashboardPage() {
       )}
 
       {/* Main Stats Row */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-3">
         {/* Satış */}
         <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6 pb-1 sm:pb-2">
@@ -438,25 +438,6 @@ export default function DashboardPage() {
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-base sm:text-2xl font-bold text-emerald-600">{formatCurrency(stats.saleInvoiceTotal)}</div>
             <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{stats.saleInvoiceCount} fatura</p>
-          </CardContent>
-        </Card>
-
-        {/* Alış */}
-        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6 pb-1 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-gray-500">Alis</CardTitle>
-            <div className="p-1.5 sm:p-2 rounded-lg bg-blue-100">
-              <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-base sm:text-2xl font-bold text-blue-600">{formatCurrency(stats.purchaseInvoiceTotal)}</div>
-            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
-              {stats.purchaseInvoiceCount} fatura
-              {stats.unpaidInvoices > 0 && (
-                <span className="text-red-500 block sm:inline sm:ml-1">({stats.unpaidInvoices} odenmemis)</span>
-              )}
-            </p>
           </CardContent>
         </Card>
 
@@ -684,14 +665,6 @@ export default function DashboardPage() {
                   <span className="font-medium text-emerald-700 text-xs sm:text-base">Toplam Satis</span>
                 </div>
                 <span className="font-bold text-emerald-600 text-xs sm:text-base">{formatCurrency(stats.saleInvoiceTotal)}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 sm:p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                  <span className="font-medium text-blue-700 text-xs sm:text-base">Toplam Alis</span>
-                </div>
-                <span className="font-bold text-blue-600 text-xs sm:text-base">-{formatCurrency(stats.purchaseInvoiceTotal)}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 sm:p-3 bg-orange-50 rounded-lg">

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -88,7 +88,7 @@ interface Customer {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-800',
-    'approved': 'bg-blue-100 text-blue-800',
+    'approved': 'bg-amber-100 text-amber-800',
     'invoiced': 'bg-purple-100 text-purple-800',
     'shipped': 'bg-cyan-100 text-cyan-800',
     'completed': 'bg-green-100 text-green-800',
@@ -153,7 +153,7 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
               <Label className="text-xs text-gray-500">Kaynak</Label>
               <p className="flex items-center gap-1 text-sm">
                 {order.source === 'mobile' ? (
-                  <><Smartphone className="h-4 w-4 text-blue-500" /> Mobil</>
+                  <><Smartphone className="h-4 w-4 text-amber-500" /> Mobil</>
                 ) : (
                   <><Monitor className="h-4 w-4 text-gray-500" /> Desktop</>
                 )}

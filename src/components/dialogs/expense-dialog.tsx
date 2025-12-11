@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Calculator } from 'lucide-react';
+import { Calculator, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { addFirestoreData, updateFirestoreData, subscribeToFirestore, subscribeToData } from '@/services/firebase';
+import { addFirestoreData, updateFirestoreData, subscribeToData, pushData } from '@/services/firebase';
 
 // DDV Oranları (Slovenya)
 const DDV_RATES = [
@@ -105,7 +105,6 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
   const [category, setCategory] = useState('other');
   const [description, setDescription] = useState('');
   const [vendorId, setVendorId] = useState('');
-  const [supplierDdvNo, setSupplierDdvNo] = useState('');
   const [grossAmount, setGrossAmount] = useState('');
   const [ddvRate, setDdvRate] = useState('22');
   const [ddvAmount, setDdvAmount] = useState('');
@@ -123,18 +122,27 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  // Load vendors from Firestore
+  // Vendor add
+  const [newVendorName, setNewVendorName] = useState('');
+  const [addingVendor, setAddingVendor] = useState(false);
+
+  // Load vendors from RTDB (same as Python desktop app: erp/expense_vendors)
   useEffect(() => {
-    const unsubscribe = subscribeToFirestore('expense_vendors', (data) => {
-      if (data && data.length > 0) {
-        const vendorList = data.map((v: any) => ({
-          id: v.id,
+    console.log('ExpenseDialog: Loading expense vendors from RTDB...');
+    const unsubscribe = subscribeToData('expense_vendors', (data) => {
+      console.log('ExpenseDialog: Expense vendors data received:', data ? Object.keys(data).length : 0);
+      if (data) {
+        const vendorList = Object.entries(data).map(([id, v]: [string, any]) => ({
+          id,
           name: v.name || '',
           category: v.category,
           taxNumber: v.taxNumber || v.ddvNumber,
         })).filter((v: ExpenseVendor) => v.name);
         vendorList.sort((a: ExpenseVendor, b: ExpenseVendor) => a.name.localeCompare(b.name));
         setVendors(vendorList);
+        console.log('ExpenseDialog: Expense vendors loaded:', vendorList.length, vendorList.map(v => v.name));
+      } else {
+        console.log('ExpenseDialog: No expense vendors data in RTDB');
       }
     });
     return () => unsubscribe();
@@ -206,7 +214,6 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         setCategory(expense.category || 'other');
         setDescription(expense.description || '');
         setVendorId(expense.vendorId || expense.supplierId || '');
-        setSupplierDdvNo(expense.supplierDdvNo || '');
         setGrossAmount(String(expense.grossAmount || expense.totalAmount || expense.amount || ''));
         setDdvRate(String(expense.ddvRate || 22));
         setDdvAmount(String(expense.ddvAmount || expense.vatAmount || ''));
@@ -226,7 +233,6 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         setCategory('other');
         setDescription('');
         setVendorId('');
-        setSupplierDdvNo('');
         setGrossAmount('');
         setDdvRate('22');
         setDdvAmount('');
@@ -241,15 +247,31 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
     }
   }, [open, expense]);
 
-  // Auto-fill DDV number when vendor is selected
-  useEffect(() => {
-    if (vendorId) {
-      const vendor = vendors.find(v => v.id === vendorId);
-      if (vendor?.taxNumber) {
-        setSupplierDdvNo(vendor.taxNumber);
+  // Add new vendor
+  const handleAddVendor = async () => {
+    if (!newVendorName.trim()) return;
+
+    setAddingVendor(true);
+    try {
+      const vendorData = {
+        name: newVendorName.trim(),
+        category: category || 'other',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const newId = await pushData('expense_vendors', vendorData);
+      if (newId) {
+        setVendorId(newId);
+        setNewVendorName('');
       }
+    } catch (error) {
+      console.error('Add vendor error:', error);
+      alert('Cari eklenemedi: ' + (error as Error).message);
+    } finally {
+      setAddingVendor(false);
     }
-  }, [vendorId, vendors]);
+  };
 
   // Calculate DDV from gross (extract DDV)
   const calculateFromGross = () => {
@@ -291,6 +313,8 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
     }
 
     setSaving(true);
+    console.log('ExpenseDialog: Starting save...');
+
     try {
       const vendor = vendors.find(v => v.id === vendorId);
       const employee = employees.find(e => e.id === employeeId);
@@ -314,7 +338,6 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         vendor: vendor?.name || '',
         supplierId: vendorId && vendorId !== 'none' ? vendorId : null,
         supplierName: vendor?.name || '',
-        supplierDdvNo: supplierDdvNo.trim(),
 
         // Employee info
         employeeId: employeeId && employeeId !== 'none' ? employeeId : null,
@@ -350,9 +373,13 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         updatedAt: new Date().toISOString(),
       };
 
+      console.log('ExpenseDialog: Expense data prepared:', expenseData);
+
       if (isEditMode && expense?.id) {
         // Update existing in Firestore
+        console.log('ExpenseDialog: Updating expense:', expense.id);
         await updateFirestoreData('expenses', expense.id, expenseData);
+        console.log('ExpenseDialog: Update successful');
       } else {
         // Create new in Firestore
         const newExpenseData = {
@@ -360,13 +387,15 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
           date: invoiceDate,
           isActive: true,
         };
-        await addFirestoreData('expenses', newExpenseData);
+        console.log('ExpenseDialog: Creating new expense in erp_expenses...');
+        const newId = await addFirestoreData('expenses', newExpenseData);
+        console.log('ExpenseDialog: Created successfully with ID:', newId);
       }
 
       onOpenChange(false);
       onSave?.();
     } catch (error) {
-      console.error('Save error:', error);
+      console.error('ExpenseDialog: Save error:', error);
       alert('Kaydetme hatasi: ' + (error as Error).message);
     } finally {
       setSaving(false);
@@ -448,9 +477,10 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
             <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">
               Tedarikci Bilgileri
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
+              {/* Mevcut carilerden sec */}
               <div className="space-y-2">
-                <Label htmlFor="vendor">Masraf Carisi</Label>
+                <Label>Masraf Carisi</Label>
                 <Select value={vendorId} onValueChange={setVendorId}>
                   <SelectTrigger>
                     <SelectValue placeholder="- Cari Secin -" />
@@ -465,14 +495,34 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="supplierDdvNo">Tedarikci DDV No</Label>
-                <Input
-                  id="supplierDdvNo"
-                  value={supplierDdvNo}
-                  onChange={(e) => setSupplierDdvNo(e.target.value)}
-                  placeholder="SI12345678"
-                />
+
+              {/* Yeni cari ekle */}
+              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                <p className="text-xs text-muted-foreground">veya yeni cari ekle:</p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Yeni cari adi"
+                    value={newVendorName}
+                    onChange={(e) => setNewVendorName(e.target.value)}
+                    className="h-8"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddVendor();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleAddVendor}
+                    disabled={!newVendorName.trim() || addingVendor}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Ekle
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

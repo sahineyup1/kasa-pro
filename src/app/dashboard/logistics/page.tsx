@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -130,11 +130,11 @@ export interface IncomingItem {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-800',
-    'approved': 'bg-blue-100 text-blue-800',
-    'confirmed': 'bg-blue-100 text-blue-800',
+    'approved': 'bg-amber-100 text-amber-800',
+    'confirmed': 'bg-amber-100 text-amber-800',
     'preparing': 'bg-purple-100 text-purple-800',
     'ready': 'bg-cyan-100 text-cyan-800',
-    'sent': 'bg-blue-100 text-blue-800',
+    'sent': 'bg-amber-100 text-amber-800',
     'in_transit': 'bg-cyan-100 text-cyan-800',
     'delivered': 'bg-green-100 text-green-800',
     'completed': 'bg-green-100 text-green-800',
@@ -169,7 +169,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function TypeBadge({ type }: { type: string }) {
   const config: Record<string, { icon: React.ReactNode; label: string; className: string }> = {
-    'request': { icon: <Package className="h-3 w-3 mr-1" />, label: 'Talep', className: 'bg-blue-50 text-blue-700' },
+    'request': { icon: <Package className="h-3 w-3 mr-1" />, label: 'Talep', className: 'bg-amber-50 text-amber-700' },
     'order': { icon: <ShoppingCart className="h-3 w-3 mr-1" />, label: 'Siparis', className: 'bg-purple-50 text-purple-700' },
     'missing': { icon: <ClipboardList className="h-3 w-3 mr-1" />, label: 'Eksik Liste', className: 'bg-amber-50 text-amber-700' },
   };
@@ -198,7 +198,7 @@ function StatCard({
   color?: 'blue' | 'green' | 'red' | 'amber' | 'purple' | 'gray' | 'cyan';
 }) {
   const colorClasses = {
-    blue: 'bg-blue-50',
+    blue: 'bg-amber-50',
     green: 'bg-green-50',
     red: 'bg-red-50',
     amber: 'bg-amber-50',
@@ -208,7 +208,7 @@ function StatCard({
   };
 
   const iconClasses = {
-    blue: 'bg-blue-100 text-blue-600',
+    blue: 'bg-amber-100 text-amber-600',
     green: 'bg-green-100 text-green-600',
     red: 'bg-red-100 text-red-600',
     amber: 'bg-amber-100 text-amber-600',
@@ -218,7 +218,7 @@ function StatCard({
   };
 
   const textClasses = {
-    blue: 'text-blue-600',
+    blue: 'text-amber-600',
     green: 'text-green-600',
     red: 'text-red-600',
     amber: 'text-amber-600',

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -243,7 +243,7 @@ export function CashCloseDialog({ open, onOpenChange, currentRegister }: CashClo
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {currentRegister && (
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-amber-50 p-4 rounded-lg">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-600">Acilis Bakiyesi:</span>
@@ -307,7 +307,7 @@ export function CashCloseDialog({ open, onOpenChange, currentRegister }: CashClo
                 <span>Fark:</span>
                 <span className={`text-xl font-bold ${
                   difference === 0 ? 'text-green-600' :
-                  difference > 0 ? 'text-blue-600' : 'text-red-600'
+                  difference > 0 ? 'text-amber-600' : 'text-red-600'
                 }`}>
                   {difference > 0 ? '+' : ''}{difference.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} EUR
                   {difference === 0 && ' ✓'}

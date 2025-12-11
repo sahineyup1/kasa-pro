@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -337,8 +337,8 @@ export function CustomerDialog({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* EU VAT Dogrulama Bolumu - En ustte */}
-          <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-medium flex items-center gap-2 text-blue-800">
+          <div className="space-y-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <h3 className="text-sm font-medium flex items-center gap-2 text-amber-800">
               <Shield className="h-4 w-4" />
               EU VAT Dogrulama (VIES)
             </h3>

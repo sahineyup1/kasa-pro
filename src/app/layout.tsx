@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { SplashScreen } from "@/components/splash/splash-screen";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#4a4543",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -54,10 +55,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Atlas ERP" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-TileColor" content="#2563eb" />
+        <meta name="msapplication-TileColor" content="#4a4543" />
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
       <body className={inter.className}>
+        <SplashScreen minDuration={2000} />
         {children}
         <PWAInstallPrompt />
         <ServiceWorkerRegistration />

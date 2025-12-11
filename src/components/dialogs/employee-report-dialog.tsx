@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ function StatCard({
   color?: 'blue' | 'green' | 'red' | 'amber' | 'purple';
 }) {
   const colorClasses = {
-    blue: 'border-l-blue-500 bg-blue-50',
+    blue: 'border-l-amber-500 bg-amber-50',
     green: 'border-l-green-500 bg-green-50',
     red: 'border-l-red-500 bg-red-50',
     amber: 'border-l-amber-500 bg-amber-50',
@@ -52,7 +52,7 @@ function StatCard({
   };
 
   const textColors = {
-    blue: 'text-blue-600',
+    blue: 'text-amber-600',
     green: 'text-green-600',
     red: 'text-red-600',
     amber: 'text-amber-600',
@@ -401,7 +401,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-                <Users className="h-6 w-6 text-blue-600" />
+                <Users className="h-6 w-6 text-amber-600" />
                 Personel Rapor Merkezi
               </DialogTitle>
               <p className="text-sm text-gray-500 mt-1">
@@ -428,7 +428,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
         <div className="flex-1 overflow-y-auto py-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -446,7 +446,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
                   <StatCard
                     title="Toplam Personel"
                     value={summaryStats.total.toString()}
-                    icon={<Users className="h-5 w-5 text-blue-600" />}
+                    icon={<Users className="h-5 w-5 text-amber-600" />}
                     color="blue"
                   />
                   <StatCard
@@ -488,7 +488,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
                 {/* Recent Hires */}
                 <div className="bg-white rounded-lg border p-4">
                   <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-blue-600" />
+                    <Calendar className="h-5 w-5 text-amber-600" />
                     Son Ise Alinanlar (30 Gun)
                   </h4>
                   {recentHires.length === 0 ? (
@@ -525,7 +525,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
                   <h4 className="font-semibold text-gray-900 mb-4">Departman Dagilimi</h4>
                   <div className="space-y-3">
                     {departmentStats.slice(0, 8).map((item, index) => {
-                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-red-500', 'bg-purple-500', 'bg-teal-500'];
+                      const colors = ['bg-amber-500', 'bg-green-500', 'bg-amber-500', 'bg-red-500', 'bg-purple-500', 'bg-teal-500'];
                       return (
                         <div key={item.department}>
                           <div className="flex items-center justify-between text-sm mb-1">
@@ -589,7 +589,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
                   <StatCard
                     title="En Dusuk Maas"
                     value={`€${salaryStats.min.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}`}
-                    icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
+                    icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
                     color="blue"
                   />
                   <StatCard
@@ -629,7 +629,7 @@ export function EmployeeReportDialog({ open, onOpenChange }: EmployeeReportDialo
                 <div className="bg-white rounded-lg border">
                   <div className="p-4 border-b">
                     <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
+                      <FileText className="h-5 w-5 text-amber-600" />
                       Vize & Belge Takibi
                     </h4>
                   </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -90,7 +90,7 @@ export default function SetupPage() {
 
   if (step === 'checking') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-white to-indigo-50">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-gray-600">Sistem kontrol ediliyor...</p>
@@ -101,7 +101,7 @@ export default function SetupPage() {
 
   if (step === 'exists') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-white to-indigo-50 p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
@@ -128,7 +128,7 @@ export default function SetupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-white to-indigo-50 p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
@@ -153,7 +153,7 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-white to-indigo-50 p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">

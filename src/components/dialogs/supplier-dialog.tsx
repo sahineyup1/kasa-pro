@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -474,12 +474,12 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
 
         <div className="flex-1 overflow-y-auto py-4">
           {/* VAT Validation Section */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <Globe className="h-5 w-5 text-blue-600" />
-              <h3 className="font-semibold text-blue-900">AB VAT Numarasi Dogrulama</h3>
+              <Globe className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-900">AB VAT Numarasi Dogrulama</h3>
             </div>
-            <p className="text-sm text-blue-700 mb-4">
+            <p className="text-sm text-amber-700 mb-4">
               Sirket bilgilerini otomatik doldurmak icin AB VAT numarasi ile baslayin
             </p>
             <div className="flex gap-3">

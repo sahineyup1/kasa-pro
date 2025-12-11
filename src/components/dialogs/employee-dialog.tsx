@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -437,7 +437,7 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSave }: Employe
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="bankSalary" className="flex items-center gap-2">
-                      <span className="text-blue-600">Resmi Maas (Banka)</span>
+                      <span className="text-amber-600">Resmi Maas (Banka)</span>
                     </Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -910,9 +910,9 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
                 </div>
 
                 {/* Price Calculator */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h5 className="font-medium text-blue-800 flex items-center gap-2">
+                    <h5 className="font-medium text-amber-800 flex items-center gap-2">
                       <Calculator className="h-4 w-4" />
                       Akilli Fiyat Hesaplayici
                     </h5>
@@ -958,7 +958,7 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
                           </div>
                           <div className="border-t pt-2 flex justify-between font-semibold">
                             <span>Onerilen Satis Fiyati:</span>
-                            <span className="text-blue-600 text-lg">€{calculatedPrice.toFixed(2)}</span>
+                            <span className="text-amber-600 text-lg">€{calculatedPrice.toFixed(2)}</span>
                           </div>
                           <Button
                             className="w-full mt-2"
@@ -1016,8 +1016,8 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
                   <span className="text-lg">📦</span> Stok Ayarlari
                 </h4>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
                     <strong>Bilgi:</strong> Urun stoku sadece Merkez Depo'ya girilebilir. Subelere dagitim transfer sistemi ile yapilir.
                   </p>
                 </div>
@@ -1366,8 +1366,8 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
                   />
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
                     💡 Et urunleri icin mensei ve helal sertifikasi onerilir.<br />
                     🇪🇺 AB standartlarina uygunluk zorunludur.
                   </p>

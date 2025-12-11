@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -387,7 +387,7 @@ export function ResponsiveStatsGrid({ children }: { children: ReactNode }) {
 
 export function StatCard({ title, value, icon, color = 'gray' }: StatCardProps) {
   const colorClasses = {
-    blue: 'border-l-blue-500 bg-blue-50',
+    blue: 'border-l-amber-500 bg-amber-50',
     green: 'border-l-green-500 bg-green-50',
     red: 'border-l-red-500 bg-red-50',
     amber: 'border-l-amber-500 bg-amber-50',
@@ -396,7 +396,7 @@ export function StatCard({ title, value, icon, color = 'gray' }: StatCardProps) 
   };
 
   const textColors = {
-    blue: 'text-blue-600',
+    blue: 'text-amber-600',
     green: 'text-green-600',
     red: 'text-red-600',
     amber: 'text-amber-600',

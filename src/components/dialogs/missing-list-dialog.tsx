@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -71,7 +71,7 @@ interface Product {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-800',
-    'sent': 'bg-blue-100 text-blue-800',
+    'sent': 'bg-amber-100 text-amber-800',
     'processing': 'bg-purple-100 text-purple-800',
     'completed': 'bg-green-100 text-green-800',
   };

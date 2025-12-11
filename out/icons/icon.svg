@@ -1,27 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
-    </linearGradient>
-  </defs>
   <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="url(#grad)"/>
-  <!-- Building Icon -->
-  <g fill="white">
-    <!-- Main building -->
-    <rect x="156" y="160" width="200" height="240" rx="8"/>
-    <!-- Windows row 1 -->
-    <rect x="180" y="190" width="40" height="40" rx="4" fill="#2563eb"/>
-    <rect x="236" y="190" width="40" height="40" rx="4" fill="#2563eb"/>
-    <rect x="292" y="190" width="40" height="40" rx="4" fill="#2563eb"/>
-    <!-- Windows row 2 -->
-    <rect x="180" y="250" width="40" height="40" rx="4" fill="#2563eb"/>
-    <rect x="236" y="250" width="40" height="40" rx="4" fill="#2563eb"/>
-    <rect x="292" y="250" width="40" height="40" rx="4" fill="#2563eb"/>
-    <!-- Door -->
-    <rect x="226" y="320" width="60" height="80" rx="4" fill="#2563eb"/>
+  <rect width="512" height="512" rx="80" fill="#4a4543"/>
+
+  <!-- Original wheat stalk - top section -->
+  <g fill="#f5a623" transform="translate(115, 25) scale(0.7)">
+    <!-- Main curved stem -->
+    <path d="M270 320 Q245 240 215 120 Q205 80 220 40" stroke="#f5a623" stroke-width="10" fill="none" stroke-linecap="round"/>
+
+    <!-- Left side grains -->
+    <ellipse cx="185" cy="280" rx="30" ry="12" transform="rotate(-55 185 280)"/>
+    <ellipse cx="172" cy="238" rx="28" ry="11" transform="rotate(-52 172 238)"/>
+    <ellipse cx="165" cy="196" rx="26" ry="10" transform="rotate(-50 165 196)"/>
+    <ellipse cx="165" cy="155" rx="24" ry="9" transform="rotate(-47 165 155)"/>
+    <ellipse cx="172" cy="118" rx="21" ry="8" transform="rotate(-43 172 118)"/>
+    <ellipse cx="185" cy="85" rx="18" ry="7" transform="rotate(-38 185 85)"/>
+
+    <!-- Right side grains -->
+    <ellipse cx="268" cy="265" rx="28" ry="11" transform="rotate(-55 268 265)"/>
+    <ellipse cx="252" cy="223" rx="26" ry="10" transform="rotate(-52 252 223)"/>
+    <ellipse cx="242" cy="182" rx="24" ry="9" transform="rotate(-50 242 182)"/>
+    <ellipse cx="235" cy="142" rx="22" ry="8" transform="rotate(-47 235 142)"/>
+    <ellipse cx="232" cy="105" rx="19" ry="7" transform="rotate(-43 232 105)"/>
+
+    <!-- Top grains -->
+    <ellipse cx="215" cy="50" rx="14" ry="20" transform="rotate(-20 215 50)"/>
+    <ellipse cx="195" cy="70" rx="12" ry="6" transform="rotate(-50 195 70)"/>
+    <ellipse cx="235" cy="65" rx="11" ry="5" transform="rotate(-25 235 65)"/>
   </g>
-  <!-- A letter accent -->
-  <text x="256" y="130" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">A</text>
+
+  <!-- Diagonal lines at top right -->
+  <g stroke="#f5a623" stroke-width="6" stroke-linecap="round">
+    <line x1="355" y1="55" x2="440" y2="140"/>
+    <line x1="380" y1="45" x2="452" y2="117"/>
+    <line x1="405" y1="40" x2="462" y2="97"/>
+  </g>
+
+  <!-- Lowercase "a" - bottom section -->
+  <text x="256" y="445"
+        font-family="Georgia, serif"
+        font-size="160"
+        font-weight="400"
+        font-style="italic"
+        fill="#f5a623"
+        text-anchor="middle">a</text>
 </svg>

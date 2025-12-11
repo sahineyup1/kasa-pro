@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -99,7 +99,7 @@ async function validateVATNumber(vatNumber: string): Promise<{
 function StatusBadge({ status }: { status: 'pending' | 'validating' | 'valid' | 'invalid' | 'skipped' }) {
   const config = {
     pending: { icon: Clock, label: 'Bekliyor', class: 'text-gray-500' },
-    validating: { icon: Loader2, label: 'Dogrulaniyor', class: 'text-blue-500' },
+    validating: { icon: Loader2, label: 'Dogrulaniyor', class: 'text-amber-500' },
     valid: { icon: CheckCircle, label: 'Gecerli', class: 'text-green-500' },
     invalid: { icon: XCircle, label: 'Gecersiz', class: 'text-red-500' },
     skipped: { icon: SkipForward, label: 'Atlandi', class: 'text-gray-400' },

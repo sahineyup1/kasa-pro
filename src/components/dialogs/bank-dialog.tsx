@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -364,7 +364,7 @@ export function BankTransactionDialog({
     switch (type) {
       case 'deposit': return <ArrowUpRight className="h-4 w-4 text-green-600" />;
       case 'withdrawal': return <ArrowDownRight className="h-4 w-4 text-red-600" />;
-      default: return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
+      default: return <ArrowLeftRight className="h-4 w-4 text-amber-600" />;
     }
   };
 
@@ -498,7 +498,7 @@ export function BankTransactionDialog({
               className={
                 formData.type === 'deposit' ? 'bg-green-600 hover:bg-green-700' :
                 formData.type === 'withdrawal' ? 'bg-red-600 hover:bg-red-700' :
-                'bg-blue-600 hover:bg-blue-700'
+                'bg-amber-600 hover:bg-amber-700'
               }
             >
               {loading ? 'Kaydediliyor...' : 'Islemi Kaydet'}

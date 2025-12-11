@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -282,8 +282,8 @@ export default function CustomersPage() {
                 <p className="text-sm text-muted-foreground">Toplam Müşteri</p>
                 <p className="text-2xl font-bold">{stats.total}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+                <Users className="h-6 w-6 text-amber-600" />
               </div>
             </div>
           </CardContent>

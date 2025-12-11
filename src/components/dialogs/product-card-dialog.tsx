@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -131,7 +131,7 @@ function StatCard({
   color?: 'blue' | 'green' | 'purple' | 'amber' | 'gray';
 }) {
   const colorClasses = {
-    blue: 'bg-blue-50 border-blue-200',
+    blue: 'bg-amber-50 border-amber-200',
     green: 'bg-green-50 border-green-200',
     purple: 'bg-purple-50 border-purple-200',
     amber: 'bg-amber-50 border-amber-200',
@@ -378,7 +378,7 @@ export function ProductCardDialog({ open, onOpenChange, product, onEdit }: Produ
         <div className="flex-1 overflow-y-auto py-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
             </div>
           ) : (
             <>
@@ -525,7 +525,7 @@ export function ProductCardDialog({ open, onOpenChange, product, onEdit }: Produ
                 <TabsContent value="stock" className="space-y-4">
                   <div className="bg-white rounded-lg border p-4">
                     <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <Package className="h-5 w-5 text-blue-600" />
+                      <Package className="h-5 w-5 text-amber-600" />
                       Toplam Stok: {getTotalStock().toFixed(0)}
                     </h4>
 
@@ -567,7 +567,7 @@ export function ProductCardDialog({ open, onOpenChange, product, onEdit }: Produ
                   <div className="bg-white rounded-lg border">
                     <div className="p-4 border-b">
                       <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                        <ShoppingCart className="h-5 w-5 text-blue-600" />
+                        <ShoppingCart className="h-5 w-5 text-amber-600" />
                         Alis Gecmisi
                       </h4>
                     </div>

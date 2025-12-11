@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,7 @@ import { ViewOrderDialog, NewOrderDialog, EditOrderDialog, ConvertToInvoiceDialo
 function OrderStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-800',
-    'approved': 'bg-blue-100 text-blue-800',
+    'approved': 'bg-amber-100 text-amber-800',
     'invoiced': 'bg-purple-100 text-purple-800',
     'shipped': 'bg-cyan-100 text-cyan-800',
     'completed': 'bg-green-100 text-green-800',
@@ -71,7 +71,7 @@ function OrderStatusBadge({ status }: { status: string }) {
 function MissingListStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     'pending': 'bg-amber-100 text-amber-800',
-    'sent': 'bg-blue-100 text-blue-800',
+    'sent': 'bg-amber-100 text-amber-800',
     'processing': 'bg-purple-100 text-purple-800',
     'completed': 'bg-green-100 text-green-800',
   };
@@ -195,7 +195,7 @@ function StatCard({
   color?: 'blue' | 'green' | 'red' | 'amber' | 'purple' | 'gray';
 }) {
   const colorClasses = {
-    blue: 'bg-blue-50',
+    blue: 'bg-amber-50',
     green: 'bg-green-50',
     red: 'bg-red-50',
     amber: 'bg-amber-50',
@@ -204,7 +204,7 @@ function StatCard({
   };
 
   const iconClasses = {
-    blue: 'bg-blue-100 text-blue-600',
+    blue: 'bg-amber-100 text-amber-600',
     green: 'bg-green-100 text-green-600',
     red: 'bg-red-100 text-red-600',
     amber: 'bg-amber-100 text-amber-600',
@@ -213,7 +213,7 @@ function StatCard({
   };
 
   const textClasses = {
-    blue: 'text-blue-600',
+    blue: 'text-amber-600',
     green: 'text-green-600',
     red: 'text-red-600',
     amber: 'text-amber-600',
@@ -1088,7 +1088,7 @@ export default function WarehousePage() {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           {order.source === 'mobile' ? (
-                            <span className="text-blue-600">Mobil</span>
+                            <span className="text-amber-600">Mobil</span>
                           ) : (
                             <span className="text-gray-600">Desktop</span>
                           )}
