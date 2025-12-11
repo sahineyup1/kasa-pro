@@ -508,6 +508,14 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
                     setVatNumber(e.target.value.replace(/\s/g, '').toUpperCase());
                     setVatResult(null);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (vatNumber.trim() && !vatValidating) {
+                        handleVatValidation();
+                      }
+                    }
+                  }}
                 />
               </div>
               <Button

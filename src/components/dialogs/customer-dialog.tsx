@@ -359,6 +359,14 @@ export function CustomerDialog({
                     setVatNumber(e.target.value.replace(/\s/g, '').toUpperCase());
                     setVatValidationResult(null);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (vatNumber.trim() && !validatingVat && !viewMode) {
+                        handleValidateVat();
+                      }
+                    }
+                  }}
                   placeholder="12345678"
                   className="bg-white"
                   disabled={viewMode}
