@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { subscribeToRTDB, updateData, removeData } from '@/services/firebase';
+import { subscribeToRTDB, subscribeToFirestore, updateData, removeData, updateFirestoreData, deleteFirestoreData } from '@/services/firebase';
 import { ProductDialog } from '@/components/dialogs/product-dialog';
 import { ProductCardDialog } from '@/components/dialogs/product-card-dialog';
 import { ReportDialog } from '@/components/dialogs/report-dialog';
@@ -192,14 +192,32 @@ export default function ProductsPage() {
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
-  // Load products from RTDB
+  // Load products from Firestore (primary) and RTDB (fallback)
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = subscribeToRTDB('products', (data) => {
-      setProducts(data || []);
+    let hasData = false;
+
+    // Try Firestore first (erp_products collection)
+    const unsubFirestore = subscribeToFirestore('products', (data) => {
+      if (data && data.length > 0) {
+        hasData = true;
+        setProducts(data);
+        setLoading(false);
+      }
+    });
+
+    // Also try RTDB as fallback
+    const unsubRTDB = subscribeToRTDB('products', (data) => {
+      if (!hasData && data && data.length > 0) {
+        setProducts(data);
+      }
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubFirestore();
+      unsubRTDB();
+    };
   }, []);
 
   // Filter products
@@ -300,16 +318,25 @@ export default function ProductsPage() {
       const currentStatus = getField(product, ['audit', 'isActive'], 'isActive', true);
       const newStatus = !currentStatus;
 
-      if (product.audit) {
-        await updateData(`products/${product.id}/audit`, {
+      // Try Firestore first, then RTDB
+      try {
+        await updateFirestoreData('products', product.id, {
           isActive: newStatus,
-          updatedAt: new Date().toISOString(),
+          'audit.isActive': newStatus,
         });
-      } else {
-        await updateData(`products/${product.id}`, {
-          isActive: newStatus,
-          updatedAt: new Date().toISOString(),
-        });
+      } catch {
+        // Fallback to RTDB
+        if (product.audit) {
+          await updateData(`products/${product.id}/audit`, {
+            isActive: newStatus,
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          await updateData(`products/${product.id}`, {
+            isActive: newStatus,
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     } catch (error) {
       console.error('Status update error:', error);
@@ -322,7 +349,13 @@ export default function ProductsPage() {
     if (!confirm(`"${name}" urununu silmek istediginize emin misiniz?`)) return;
 
     try {
-      await removeData(`products/${product.id}`);
+      // Try Firestore first, then RTDB
+      try {
+        await deleteFirestoreData('products', product.id);
+      } catch {
+        // Fallback to RTDB
+        await removeData(`products/${product.id}`);
+      }
     } catch (error) {
       console.error('Delete error:', error);
       alert('Silme hatasi: ' + (error as Error).message);

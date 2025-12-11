@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
   Tabs,
   TabsContent,
@@ -39,7 +40,8 @@ import {
   Wallet, Building2, CreditCard, TrendingUp, TrendingDown, DollarSign,
   ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2, Calculator,
   ChevronRight, PiggyBank, Landmark, Receipt, FileText, AlertCircle,
-  CheckCircle, Clock, Settings, List, FileDown, Store, MapPin, Lock, Unlock
+  CheckCircle, Clock, Settings, List, FileDown, Store, MapPin, Lock, Unlock,
+  Percent, ShoppingCart, Package, Coins
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -180,6 +182,50 @@ interface BranchBankAccount {
   leasingRemaining?: number;
 }
 
+// KDV Raporu icin interface'ler
+interface SaleInvoice {
+  id: string;
+  invoiceDate?: string;
+  branchId?: string;
+  branchName?: string;
+  total?: number;
+  vatAmount?: number;
+  subtotal?: number;
+  status?: string;
+}
+
+interface PurchaseInvoice {
+  id: string;
+  invoiceDate?: string;
+  branchId?: string;
+  branchName?: string;
+  total?: number;
+  vatAmount?: number;
+  subtotal?: number;
+  status?: string;
+}
+
+interface Expense {
+  id: string;
+  date?: string;
+  branchId?: string;
+  branchName?: string;
+  grossAmount?: number;
+  totalAmount?: number;
+  ddvAmount?: number;
+  vatAmount?: number;
+  netAmount?: number;
+}
+
+// Sube listesi (KDV hesaplamalari icin)
+const KDV_BRANCHES: Record<string, { name: string; icon: string; color: string }> = {
+  'genel': { name: 'Genel Giderler', icon: '🏢', color: 'bg-gray-100 text-gray-700' },
+  'merkez': { name: 'Merkez Depo', icon: '🏭', color: 'bg-blue-100 text-blue-700' },
+  'balkan': { name: 'Balkan Market', icon: '🛒', color: 'bg-green-100 text-green-700' },
+  'desetka': { name: 'Desetka Market', icon: '🛒', color: 'bg-purple-100 text-purple-700' },
+  'mesnica': { name: 'Mesnica Kasap', icon: '🥩', color: 'bg-red-100 text-red-700' },
+};
+
 // Transaction type badge
 function TransactionTypeBadge({ type }: { type: string }) {
   const styles: Record<string, string> = {
@@ -246,6 +292,22 @@ export default function FinancePage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [branchesLoading, setBranchesLoading] = useState(true);
+
+  // KDV Raporu icin data
+  const [saleInvoices, setSaleInvoices] = useState<SaleInvoice[]>([]);
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+
+  // KDV Raporu icin tarih filtreleri
+  const [kdvStartDate, setKdvStartDate] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [kdvEndDate, setKdvEndDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
+  // Genel masraf dagitimi
+  const [enableDistribution, setEnableDistribution] = useState(false);
 
   // Branch filter - separate for Kasa and Banka
   const [selectedKasaBranch, setSelectedKasaBranch] = useState<string>('');
@@ -360,6 +422,21 @@ export default function FinancePage() {
       setBranchesLoading(false);
     });
 
+    // KDV Raporu icin - Satis Faturalari
+    const unsubSaleInvoices = subscribeToFirestore('saleInvoices', (data) => {
+      setSaleInvoices(data || []);
+    });
+
+    // KDV Raporu icin - Alis Faturalari
+    const unsubPurchaseInvoices = subscribeToFirestore('purchaseInvoices', (data) => {
+      setPurchaseInvoices(data || []);
+    });
+
+    // KDV Raporu icin - Masraflar
+    const unsubExpenses = subscribeToFirestore('expenses', (data) => {
+      setExpenses(data || []);
+    });
+
     return () => {
       unsubTransactions();
       unsubBankAccounts();
@@ -369,6 +446,9 @@ export default function FinancePage() {
       unsubRTDBCredits();
       unsubCreditPayments();
       unsubBranches();
+      unsubSaleInvoices();
+      unsubPurchaseInvoices();
+      unsubExpenses();
     };
   }, []);
 
@@ -497,6 +577,176 @@ export default function FinancePage() {
       totalBranchBankBalance,
     };
   }, [branches]);
+
+  // KDV (DDV) Hesaplamalari
+  const kdvStats = useMemo(() => {
+    // Tarih filtresi
+    const filterByDate = (date?: string) => {
+      if (!date) return false;
+      const d = date.split('T')[0];
+      return d >= kdvStartDate && d <= kdvEndDate;
+    };
+
+    // Satis KDV'si - sube bazli
+    const salesByBranch: Record<string, { sales: number; vat: number; count: number }> = {};
+    saleInvoices
+      .filter((inv) => filterByDate(inv.invoiceDate) && inv.status !== 'cancelled')
+      .forEach((inv) => {
+        const branchId = inv.branchId || 'merkez';
+        if (!salesByBranch[branchId]) {
+          salesByBranch[branchId] = { sales: 0, vat: 0, count: 0 };
+        }
+        salesByBranch[branchId].sales += inv.subtotal || inv.total || 0;
+        salesByBranch[branchId].vat += inv.vatAmount || 0;
+        salesByBranch[branchId].count++;
+      });
+
+    // Alis KDV'si - tumu Merkez'e
+    const purchaseStats = {
+      purchases: 0,
+      vat: 0,
+      count: 0,
+    };
+    purchaseInvoices
+      .filter((inv) => filterByDate(inv.invoiceDate) && inv.status !== 'cancelled')
+      .forEach((inv) => {
+        purchaseStats.purchases += inv.subtotal || inv.total || 0;
+        purchaseStats.vat += inv.vatAmount || 0;
+        purchaseStats.count++;
+      });
+
+    // Masraf KDV'si - sube bazli
+    const expensesByBranch: Record<string, { expenses: number; vat: number; count: number }> = {};
+    expenses
+      .filter((exp) => filterByDate(exp.date))
+      .forEach((exp) => {
+        const branchId = exp.branchId || 'genel';
+        if (!expensesByBranch[branchId]) {
+          expensesByBranch[branchId] = { expenses: 0, vat: 0, count: 0 };
+        }
+        expensesByBranch[branchId].expenses += exp.netAmount || exp.grossAmount || exp.totalAmount || 0;
+        expensesByBranch[branchId].vat += exp.ddvAmount || exp.vatAmount || 0;
+        expensesByBranch[branchId].count++;
+      });
+
+    // Genel masraf ve alis dagitimi icin satis oranlarini hesapla
+    // Dagitim yapilacak subeler: merkez, balkan, desetka, mesnica (genel haric)
+    const distributableBranches = ['merkez', 'balkan', 'desetka', 'mesnica'];
+    const totalSalesForDistribution = distributableBranches.reduce(
+      (sum, bid) => sum + (salesByBranch[bid]?.sales || 0),
+      0
+    );
+
+    // Her subenin satis orani
+    const salesRatios: Record<string, number> = {};
+    distributableBranches.forEach((bid) => {
+      const branchSales = salesByBranch[bid]?.sales || 0;
+      salesRatios[bid] = totalSalesForDistribution > 0 ? branchSales / totalSalesForDistribution : 0.25;
+    });
+
+    // Genel masraflar (dagitilacak)
+    const genelExpenses = expensesByBranch['genel'] || { expenses: 0, vat: 0, count: 0 };
+
+    // Sube bazli ozet
+    const branchSummary = Object.keys(KDV_BRANCHES).map((branchId) => {
+      const branch = KDV_BRANCHES[branchId];
+      const sales = salesByBranch[branchId] || { sales: 0, vat: 0, count: 0 };
+      let expenseData = expensesByBranch[branchId] || { expenses: 0, vat: 0, count: 0 };
+
+      // Dagitim aktifse ve bu sube dagitilabilir bir subeyse
+      let distributedExpense = 0;
+      let distributedExpenseVat = 0;
+      let distributedPurchase = 0;
+      let distributedPurchaseVat = 0;
+
+      if (enableDistribution && distributableBranches.includes(branchId)) {
+        const ratio = salesRatios[branchId] || 0;
+
+        // Genel masraflari dagit
+        distributedExpense = genelExpenses.expenses * ratio;
+        distributedExpenseVat = genelExpenses.vat * ratio;
+
+        // Alislari dagit (merkez disindaki subelere de oran kadar dagit)
+        distributedPurchase = purchaseStats.purchases * ratio;
+        distributedPurchaseVat = purchaseStats.vat * ratio;
+      }
+
+      // Alis KDV'si - dagitim aktif degilse sadece Merkez'e, aktifse dagitilmis
+      const purchaseVat = enableDistribution
+        ? distributedPurchaseVat
+        : (branchId === 'merkez' ? purchaseStats.vat : 0);
+      const purchaseAmount = enableDistribution
+        ? distributedPurchase
+        : (branchId === 'merkez' ? purchaseStats.purchases : 0);
+      const purchaseCount = branchId === 'merkez' ? purchaseStats.count : 0;
+
+      // Masraf - dagitim aktifse eklenen genel masraf dahil, genel icin 0
+      const finalExpenseAmount = branchId === 'genel'
+        ? (enableDistribution ? 0 : expenseData.expenses)
+        : expenseData.expenses + (enableDistribution ? distributedExpense : 0);
+      const finalExpenseVat = branchId === 'genel'
+        ? (enableDistribution ? 0 : expenseData.vat)
+        : expenseData.vat + (enableDistribution ? distributedExpenseVat : 0);
+
+      const netVat = sales.vat - purchaseVat - finalExpenseVat;
+
+      return {
+        branchId,
+        branchName: branch.name,
+        icon: branch.icon,
+        color: branch.color,
+        // Satis
+        salesAmount: sales.sales,
+        salesVat: sales.vat,
+        salesCount: sales.count,
+        salesRatio: salesRatios[branchId] || 0,
+        // Alis
+        purchaseAmount,
+        purchaseVat,
+        purchaseCount,
+        // Masraf (dagitilmis dahil)
+        expenseAmount: finalExpenseAmount,
+        expenseVat: finalExpenseVat,
+        expenseCount: expenseData.count,
+        // Dagitim detaylari
+        distributedExpense: enableDistribution ? distributedExpense : 0,
+        distributedExpenseVat: enableDistribution ? distributedExpenseVat : 0,
+        distributedPurchaseVat: enableDistribution ? distributedPurchaseVat : 0,
+        // Net KDV
+        netVat,
+      };
+    });
+
+    // Toplam
+    const totalSalesVat = branchSummary.reduce((sum, b) => sum + b.salesVat, 0);
+    const totalPurchaseVat = purchaseStats.vat;
+    const totalExpenseVat = enableDistribution
+      ? branchSummary.filter(b => b.branchId !== 'genel').reduce((sum, b) => sum + b.expenseVat, 0)
+      : branchSummary.reduce((sum, b) => sum + b.expenseVat, 0);
+    const totalNetVat = totalSalesVat - totalPurchaseVat - totalExpenseVat;
+
+    return {
+      branchSummary: enableDistribution
+        ? branchSummary.filter(b => b.branchId !== 'genel') // Dagitim aktifse genel'i gosterme
+        : branchSummary,
+      totals: {
+        salesVat: totalSalesVat,
+        purchaseVat: totalPurchaseVat,
+        expenseVat: totalExpenseVat,
+        netVat: totalNetVat,
+        salesAmount: branchSummary.reduce((sum, b) => sum + b.salesAmount, 0),
+        purchaseAmount: purchaseStats.purchases,
+        expenseAmount: branchSummary.reduce((sum, b) => sum + b.expenseAmount, 0),
+      },
+      // Dagitim bilgileri
+      distribution: {
+        enabled: enableDistribution,
+        genelExpenses: genelExpenses.expenses,
+        genelExpenseVat: genelExpenses.vat,
+        salesRatios,
+      },
+    };
+  }, [saleInvoices, purchaseInvoices, expenses, kdvStartDate, kdvEndDate, enableDistribution]);
 
   const handleRefresh = () => {
     setLoading(true);
@@ -707,7 +957,7 @@ export default function FinancePage() {
       {/* Content */}
       <div className="flex-1 overflow-auto p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 mb-6">
+          <TabsList className="grid w-full grid-cols-8 mb-6">
             <TabsTrigger value="dashboard">
               <TrendingUp className="h-4 w-4 mr-2" />
               Hazine Ozeti
@@ -715,6 +965,10 @@ export default function FinancePage() {
             <TabsTrigger value="branches">
               <Store className="h-4 w-4 mr-2" />
               Sube Kasalari
+            </TabsTrigger>
+            <TabsTrigger value="kdv">
+              <Percent className="h-4 w-4 mr-2" />
+              DDV Raporu
             </TabsTrigger>
             <TabsTrigger value="cash">
               <Wallet className="h-4 w-4 mr-2" />
@@ -1118,6 +1372,249 @@ export default function FinancePage() {
                   })}
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          {/* ==================== DDV (KDV) RAPORU TAB ==================== */}
+          <TabsContent value="kdv">
+            {/* Tarih Filtresi ve Dagitim Toggle */}
+            <div className="bg-white rounded-lg border mb-6 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Label className="font-semibold">Donem:</Label>
+                  <Input
+                    type="date"
+                    value={kdvStartDate}
+                    onChange={(e) => setKdvStartDate(e.target.value)}
+                    className="w-40"
+                  />
+                  <span className="text-gray-400">—</span>
+                  <Input
+                    type="date"
+                    value={kdvEndDate}
+                    onChange={(e) => setKdvEndDate(e.target.value)}
+                    className="w-40"
+                  />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="distribution"
+                      checked={enableDistribution}
+                      onCheckedChange={setEnableDistribution}
+                    />
+                    <Label htmlFor="distribution" className="text-sm cursor-pointer">
+                      Masraf Dagitimi
+                    </Label>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    DDV = Satis DDV - Alis DDV - Masraf DDV
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dagitim Bilgisi */}
+            {enableDistribution && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                <h4 className="font-medium text-purple-800 mb-2 flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  Masraf Dagitimi Aktif
+                </h4>
+                <p className="text-sm text-purple-700 mb-3">
+                  Genel giderler (€{kdvStats.distribution.genelExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 2 })})
+                  ve alislar satis oranina gore subelere dagitildi.
+                </p>
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  {Object.entries(kdvStats.distribution.salesRatios).map(([bid, ratio]) => (
+                    <div key={bid} className="bg-white rounded p-2 text-center">
+                      <span className="font-medium">{KDV_BRANCHES[bid]?.icon} {KDV_BRANCHES[bid]?.name}</span>
+                      <div className="text-purple-600 font-bold">{(ratio * 100).toFixed(1)}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Toplam DDV Ozeti */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="bg-white rounded-lg border-l-4 border-l-green-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <ShoppingCart className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Satis DDV</p>
+                    <p className="text-xl font-semibold text-green-600">
+                      €{kdvStats.totals.salesVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Satis: €{kdvStats.totals.salesAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border-l-4 border-l-blue-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Package className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Alis DDV</p>
+                    <p className="text-xl font-semibold text-blue-600">
+                      €{kdvStats.totals.purchaseVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Alis: €{kdvStats.totals.purchaseAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border-l-4 border-l-orange-500 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <Receipt className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Masraf DDV</p>
+                    <p className="text-xl font-semibold text-orange-600">
+                      €{kdvStats.totals.expenseVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Masraf: €{kdvStats.totals.expenseAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`bg-white rounded-lg border-l-4 p-4 ${kdvStats.totals.netVat >= 0 ? 'border-l-red-500' : 'border-l-green-500'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${kdvStats.totals.netVat >= 0 ? 'bg-red-100' : 'bg-green-100'}`}>
+                    <Coins className={`h-5 w-5 ${kdvStats.totals.netVat >= 0 ? 'text-red-600' : 'text-green-600'}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Net DDV</p>
+                    <p className={`text-xl font-semibold ${kdvStats.totals.netVat >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      €{kdvStats.totals.netVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {kdvStats.totals.netVat >= 0 ? 'Odenmesi gereken' : 'Iade alinacak'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sube Bazli DDV Tablosu */}
+            <div className="bg-white rounded-lg border">
+              <div className="p-4 border-b">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Percent className="h-5 w-5" />
+                  Sube Bazli DDV Detayi
+                </h3>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sube</TableHead>
+                    <TableHead className="text-right">Satis</TableHead>
+                    <TableHead className="text-right text-green-700">Satis DDV</TableHead>
+                    <TableHead className="text-right">Alis</TableHead>
+                    <TableHead className="text-right text-blue-700">Alis DDV</TableHead>
+                    <TableHead className="text-right">Masraf</TableHead>
+                    <TableHead className="text-right text-orange-700">Masraf DDV</TableHead>
+                    <TableHead className="text-right font-bold">Net DDV</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {kdvStats.branchSummary.map((branch) => (
+                    <TableRow key={branch.branchId}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded text-xs ${branch.color}`}>
+                            {branch.icon} {branch.branchName}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        €{branch.salesAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        <span className="text-xs text-gray-400 ml-1">({branch.salesCount})</span>
+                      </TableCell>
+                      <TableCell className="text-right text-green-600 font-medium">
+                        €{branch.salesVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {branch.branchId === 'merkez' ? (
+                          <>
+                            €{branch.purchaseAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            <span className="text-xs text-gray-400 ml-1">({branch.purchaseCount})</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-blue-600 font-medium">
+                        {branch.branchId === 'merkez' ? (
+                          <>€{branch.purchaseVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        €{branch.expenseAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                        <span className="text-xs text-gray-400 ml-1">({branch.expenseCount})</span>
+                      </TableCell>
+                      <TableCell className="text-right text-orange-600 font-medium">
+                        €{branch.expenseVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className={`text-right font-bold ${branch.netVat >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        €{branch.netVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Toplam Satiri */}
+                  <TableRow className="bg-gray-50 font-bold">
+                    <TableCell>TOPLAM</TableCell>
+                    <TableCell className="text-right">
+                      €{kdvStats.totals.salesAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right text-green-700">
+                      €{kdvStats.totals.salesVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      €{kdvStats.totals.purchaseAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right text-blue-700">
+                      €{kdvStats.totals.purchaseVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      €{kdvStats.totals.expenseAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right text-orange-700">
+                      €{kdvStats.totals.expenseVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className={`text-right ${kdvStats.totals.netVat >= 0 ? 'text-red-700' : 'text-green-700'}`}>
+                      €{kdvStats.totals.netVat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* DDV Aciklama */}
+            <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <h4 className="font-medium text-amber-800 mb-2">DDV Hesaplama Aciklamasi</h4>
+              <ul className="text-sm text-amber-700 space-y-1">
+                <li>• <strong>Satis DDV:</strong> Musterilere yapilan satislardan tahsil edilen DDV</li>
+                <li>• <strong>Alis DDV:</strong> Tedarikicilerden yapilan alislardan odenen DDV (Tum alislar Merkez Depo'ya)</li>
+                <li>• <strong>Masraf DDV:</strong> Isletme giderlerinden odenen DDV (sube bazli)</li>
+                <li>• <strong>Net DDV:</strong> Satis DDV - Alis DDV - Masraf DDV = Devlete odenmesi/iade alinmasi gereken tutar</li>
+                <li className="pt-2 text-amber-600">
+                  <strong>Not:</strong> Pozitif deger = Odenmesi gereken | Negatif deger = Iade alinacak
+                </li>
+              </ul>
             </div>
           </TabsContent>
 

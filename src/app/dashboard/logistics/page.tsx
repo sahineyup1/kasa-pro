@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { BulkTransferDialog } from '@/components/dialogs/bulk-transfer-dialog';
 import { WaybillReceiveDialog } from '@/components/dialogs/waybill-receive-dialog';
+import { InternalTransferDialog } from '@/components/dialogs/internal-transfer-dialog';
 
 // =================== INTERFACES ===================
 
@@ -264,8 +265,12 @@ export default function LogisticsPage() {
   // Dialog states
   const [bulkTransferDialogOpen, setBulkTransferDialogOpen] = useState(false);
   const [waybillReceiveDialogOpen, setWaybillReceiveDialogOpen] = useState(false);
+  const [internalTransferDialogOpen, setInternalTransferDialogOpen] = useState(false);
   const [selectedWaybill, setSelectedWaybill] = useState<Waybill | null>(null);
   const [selectedTransferItems, setSelectedTransferItems] = useState<IncomingItem[]>([]);
+
+  // Internal transfers (İç Sevkiyat)
+  const [internalTransfers, setInternalTransfers] = useState<any[]>([]);
 
   // =================== LOAD DATA ===================
   useEffect(() => {
@@ -301,12 +306,18 @@ export default function LogisticsPage() {
       setLoading(false);
     });
 
+    // İç Sevkiyat (Internal Transfers)
+    const unsubInternalTransfers = subscribeToRTDB('internal_transfers', (data) => {
+      setInternalTransfers(data || []);
+    });
+
     return () => {
       unsubRequests();
       unsubOrders();
       unsubMissing();
       unsubTransfers();
       unsubWaybills();
+      unsubInternalTransfers();
     };
   }, []);
 
@@ -507,10 +518,14 @@ export default function LogisticsPage() {
       {/* Content */}
       <div className="flex-1 overflow-auto p-4 lg:p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="incoming" className="text-xs sm:text-sm">
               <Package className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Gelen</span> Talepler
+            </TabsTrigger>
+            <TabsTrigger value="internal" className="text-xs sm:text-sm">
+              <ArrowRight className="h-4 w-4 mr-1 sm:mr-2" />
+              Ic Sevkiyat
             </TabsTrigger>
             <TabsTrigger value="transfer" className="text-xs sm:text-sm">
               <Truck className="h-4 w-4 mr-1 sm:mr-2" />
@@ -657,6 +672,182 @@ export default function LogisticsPage() {
             </div>
           </TabsContent>
 
+          {/* =================== İÇ SEVKİYAT TAB =================== */}
+          <TabsContent value="internal" className="space-y-4">
+            {/* Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                icon={<ArrowRight className="h-5 w-5" />}
+                title="Toplam Transfer"
+                value={internalTransfers.length}
+                color="blue"
+              />
+              <StatCard
+                icon={<Clock className="h-5 w-5" />}
+                title="Beklemede"
+                value={internalTransfers.filter(t => t.status === 'pending').length}
+                color="amber"
+              />
+              <StatCard
+                icon={<Truck className="h-5 w-5" />}
+                title="Yolda"
+                value={internalTransfers.filter(t => t.status === 'in_transit').length}
+                color="cyan"
+              />
+              <StatCard
+                icon={<CheckCircle className="h-5 w-5" />}
+                title="Teslim Edildi"
+                value={internalTransfers.filter(t => t.status === 'delivered').length}
+                color="green"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-500">
+                Merkez Depo ve Mesnica'dan diger subelere urun transferi
+              </p>
+              <Button onClick={() => setInternalTransferDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Yeni Ic Sevkiyat
+              </Button>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Transfer No</TableHead>
+                    <TableHead>Tip</TableHead>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>Kaynak</TableHead>
+                    <TableHead>Hedef</TableHead>
+                    <TableHead className="text-right">Kalem</TableHead>
+                    <TableHead>Durum</TableHead>
+                    <TableHead className="w-[100px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        Yukleniyor...
+                      </TableCell>
+                    </TableRow>
+                  ) : internalTransfers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        Henuz ic sevkiyat bulunamadi
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    internalTransfers
+                      .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
+                      .slice(0, 50)
+                      .map((transfer) => (
+                        <TableRow key={transfer.id}>
+                          <TableCell className="font-mono font-medium">{transfer.transferNumber || '-'}</TableCell>
+                          <TableCell>
+                            {transfer.transferType === 'iade' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                                ↩ Iade
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                → Sevkiyat
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>{transfer.transferDate || transfer.createdAt?.split('T')[0] || '-'}</TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center gap-1">
+                              {transfer.fromBranch === 'merkez' ? '🏭' :
+                               transfer.fromBranch === 'mesnica' ? '🥩' : '🛒'}
+                              {transfer.fromBranchName || transfer.fromBranch}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center gap-1">
+                              {transfer.toBranch === 'merkez' ? '🏭' :
+                               transfer.toBranch === 'mesnica' ? '🥩' : '🛒'}
+                              {transfer.toBranchName || transfer.toBranch}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">{transfer.itemCount || transfer.items?.length || 0}</TableCell>
+                          <TableCell><StatusBadge status={transfer.status || 'pending'} /></TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Detay
+                                </DropdownMenuItem>
+                                {transfer.status === 'pending' && (
+                                  <DropdownMenuItem onClick={async () => {
+                                    if (!confirm('Sevkiyati baslatmak istediginize emin misiniz?')) return;
+                                    try {
+                                      await updateData(`internal_transfers/${transfer.id}`, {
+                                        status: 'in_transit',
+                                        dispatchedAt: new Date().toISOString(),
+                                      });
+                                    } catch (error) {
+                                      console.error(error);
+                                    }
+                                  }}>
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Sevk Et
+                                  </DropdownMenuItem>
+                                )}
+                                {transfer.status === 'in_transit' && (
+                                  <DropdownMenuItem onClick={async () => {
+                                    if (!confirm('Teslim alindi olarak isaretle?')) return;
+                                    try {
+                                      await updateData(`internal_transfers/${transfer.id}`, {
+                                        status: 'delivered',
+                                        deliveredAt: new Date().toISOString(),
+                                      });
+                                    } catch (error) {
+                                      console.error(error);
+                                    }
+                                  }}>
+                                    <Box className="h-4 w-4 mr-2" />
+                                    Teslim Al
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Bilgilendirme */}
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-blue-800 mb-2">Ic Sevkiyat Akisi</h4>
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">Beklemede</span>
+                <ArrowRight className="h-4 w-4" />
+                <span className="px-2 py-1 bg-cyan-100 text-cyan-700 rounded">Yolda</span>
+                <ArrowRight className="h-4 w-4" />
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Teslim Edildi</span>
+              </div>
+              <div className="mt-3 text-xs text-blue-600 space-y-1">
+                <p>• <strong>Merkez Depo</strong> → Tum subelere gonderebilir</p>
+                <p>• <strong>Mesnica Kasap</strong> → Marketlere et gonderebilir</p>
+                <p>• <strong>Marketler</strong> → Bosa cikan etleri Mesnica'ya iade edebilir</p>
+              </div>
+            </div>
+          </TabsContent>
+
           {/* =================== TRANSFER TAB =================== */}
           <TabsContent value="transfer" className="space-y-4">
             <div className="bg-white rounded-lg border p-8 text-center">
@@ -780,6 +971,11 @@ export default function LogisticsPage() {
         open={waybillReceiveDialogOpen}
         onOpenChange={setWaybillReceiveDialogOpen}
         waybill={selectedWaybill}
+        onSuccess={handleRefresh}
+      />
+      <InternalTransferDialog
+        open={internalTransferDialogOpen}
+        onOpenChange={setInternalTransferDialogOpen}
         onSuccess={handleRefresh}
       />
     </div>
