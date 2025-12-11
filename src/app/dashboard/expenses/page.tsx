@@ -167,6 +167,15 @@ const PAYMENT_STATUSES: Record<string, { label: string; color: string }> = {
   cancelled: { label: 'Iptal', color: 'bg-gray-100 text-gray-700' },
 };
 
+// Şubeler
+const BRANCHES: Record<string, { name: string; icon: string; color: string }> = {
+  genel: { name: 'Genel Giderler', icon: '🏢', color: 'bg-slate-100 text-slate-700' },
+  merkez: { name: 'Merkez Depo', icon: '🏭', color: 'bg-blue-100 text-blue-700' },
+  balkan: { name: 'Balkan Market', icon: '🛒', color: 'bg-green-100 text-green-700' },
+  desetka: { name: 'Desetka Market', icon: '🛒', color: 'bg-emerald-100 text-emerald-700' },
+  mesnica: { name: 'Mesnica Kasap', icon: '🥩', color: 'bg-red-100 text-red-700' },
+};
+
 const DDV_RATES = [
   { value: 22, label: '22% - Standart' },
   { value: 9.5, label: '9.5% - Indirimli' },
@@ -1019,6 +1028,7 @@ function VouchersTab({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState('all');
 
   const filteredExpenses = expenses.filter((expense) => {
     const vendorText = expense.vendorName || expense.vendor || '';
@@ -1030,7 +1040,9 @@ function VouchersTab({
       selectedCategory === 'all' || expense.category === selectedCategory;
     const status = expense.paymentStatus || expense.status || 'pending';
     const matchesStatus = selectedStatus === 'all' || status === selectedStatus;
-    return matchesSearch && matchesCategory && matchesStatus;
+    const branchId = expense.branchId || 'genel';
+    const matchesBranch = selectedBranch === 'all' || branchId === selectedBranch;
+    return matchesSearch && matchesCategory && matchesStatus && matchesBranch;
   });
 
   const stats = {
@@ -1045,6 +1057,18 @@ function VouchersTab({
       return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
     }).length,
   };
+
+  // Şube bazlı masraf özeti
+  const branchStats = Object.entries(BRANCHES).map(([branchId, branchInfo]) => {
+    const branchExpenses = expenses.filter((e) => (e.branchId || 'genel') === branchId);
+    return {
+      branchId,
+      ...branchInfo,
+      count: branchExpenses.length,
+      total: branchExpenses.reduce((sum, e) => sum + (e.grossAmount || e.totalAmount || 0), 0),
+      ddv: branchExpenses.reduce((sum, e) => sum + (e.ddvAmount || e.vatAmount || 0), 0),
+    };
+  });
 
   return (
     <>
@@ -1098,6 +1122,52 @@ function VouchersTab({
         </Card>
       </div>
 
+      {/* Şube Bazlı Masraf Özeti */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Sube Bazli Masraf Ozeti
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {branchStats.map((branch) => (
+              <button
+                key={branch.branchId}
+                onClick={() => setSelectedBranch(branch.branchId)}
+                className={`p-3 rounded-lg border text-left transition-all hover:shadow-md ${
+                  selectedBranch === branch.branchId
+                    ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                    : 'border-muted hover:border-primary/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">{branch.icon}</span>
+                  <span className="text-xs font-medium truncate">{branch.name}</span>
+                </div>
+                <div className="text-lg font-bold text-primary">
+                  {formatCurrency(branch.total)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {branch.count} fis • DDV: {formatCurrency(branch.ddv)}
+                </div>
+              </button>
+            ))}
+          </div>
+          {selectedBranch !== 'all' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-3"
+              onClick={() => setSelectedBranch('all')}
+            >
+              Filtreyi Temizle
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -1113,7 +1183,19 @@ function VouchersTab({
                   className="pl-9"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
+                <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <SelectTrigger className="w-full sm:w-[160px]">
+                    <Store className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Sube" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tum Subeler</SelectItem>
+                    {Object.entries(BRANCHES).map(([key, { name, icon }]) => (
+                      <SelectItem key={key} value={key}>{icon} {name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="w-full sm:w-[160px]">
                     <SelectValue placeholder="Kategori" />
@@ -1153,6 +1235,7 @@ function VouchersTab({
             <TableHeader>
               <TableRow>
                 <TableHead>Tarih</TableHead>
+                <TableHead>Sube</TableHead>
                 <TableHead>Cari/Tedarikci</TableHead>
                 <TableHead>Kategori</TableHead>
                 <TableHead className="hidden lg:table-cell">Aciklama</TableHead>
@@ -1166,7 +1249,7 @@ function VouchersTab({
             <TableBody>
               {filteredExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium">Masraf bulunamadi</h3>
                     <p className="text-muted-foreground">
@@ -1177,6 +1260,8 @@ function VouchersTab({
               ) : (
                 filteredExpenses.map((expense) => {
                   const expenseDate = expense.documentDate || expense.date || '';
+                  const branchId = expense.branchId || 'genel';
+                  const branchInfo = BRANCHES[branchId] || BRANCHES.genel;
                   const vendorDisplay = expense.vendorName || expense.vendor || '-';
                   const catInfo = EXPENSE_CATEGORIES[expense.category] || EXPENSE_CATEGORIES.other;
                   const descDisplay = expense.description || expense.notes || '-';
@@ -1190,6 +1275,11 @@ function VouchersTab({
                     <TableRow key={expense.id}>
                       <TableCell className="font-medium">
                         {formatDate(expenseDate)}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${branchInfo.color}`}>
+                          {branchInfo.icon} {branchInfo.name}
+                        </span>
                       </TableCell>
                       <TableCell>{vendorDisplay}</TableCell>
                       <TableCell>

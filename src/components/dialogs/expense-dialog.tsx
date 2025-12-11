@@ -87,6 +87,15 @@ const EU_COUNTRIES = [
   { code: 'GR', name: 'Yunanistan' },
 ];
 
+// Şubeler
+const BRANCHES = [
+  { id: 'genel', name: 'Genel Giderler', icon: '🏢', description: 'Vergi, sicil, muhasebe vb.' },
+  { id: 'merkez', name: 'Merkez Depo', icon: '🏭', description: 'Depo masrafları' },
+  { id: 'balkan', name: 'Balkan Market', icon: '🛒', description: 'Şube masrafları' },
+  { id: 'desetka', name: 'Desetka Market', icon: '🛒', description: 'Şube masrafları' },
+  { id: 'mesnica', name: 'Mesnica Kasap', icon: '🥩', description: 'Kasap masrafları' },
+];
+
 interface ExpenseVendor {
   id: string;
   name: string;
@@ -119,6 +128,7 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
   const isEditMode = !!expense;
 
   // Form state
+  const [branchId, setBranchId] = useState('genel');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
   const [serviceDate, setServiceDate] = useState('');
@@ -239,6 +249,7 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
     if (open) {
       if (expense) {
         // Edit mode - load expense data
+        setBranchId(expense.branchId || 'genel');
         setInvoiceNo(expense.invoiceNo || expense.documentNo || '');
         setInvoiceDate(expense.invoiceDate || expense.documentDate || '');
         setServiceDate(expense.serviceDate || expense.invoiceDate || '');
@@ -258,6 +269,7 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
       } else {
         // New expense - reset form
         const today = new Date().toISOString().split('T')[0];
+        setBranchId('genel');
         setInvoiceNo('');
         setInvoiceDate(today);
         setServiceDate(today);
@@ -395,8 +407,13 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
       const vendor = vendors.find(v => v.id === vendorId);
       const employee = employees.find(e => e.id === employeeId);
       const vehicle = vehicles.find(v => v.id === vehicleId);
+      const branch = BRANCHES.find(b => b.id === branchId);
 
       const expenseData = {
+        // Branch info
+        branchId,
+        branchName: branch?.name || 'Genel Giderler',
+
         // Invoice info
         invoiceNo: invoiceNo.trim(),
         documentNo: invoiceNo.trim(),
@@ -488,6 +505,28 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
+          {/* Şube Seçimi */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Şube *</Label>
+            <div className="grid grid-cols-5 gap-2">
+              {BRANCHES.map((branch) => (
+                <button
+                  key={branch.id}
+                  type="button"
+                  onClick={() => setBranchId(branch.id)}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    branchId === branch.id
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                      : 'border-muted hover:border-primary/50 hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="text-xl mb-1">{branch.icon}</div>
+                  <div className="text-xs font-medium truncate">{branch.name}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Fatura Bilgileri */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground border-b pb-2">
