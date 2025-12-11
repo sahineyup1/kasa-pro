@@ -23,7 +23,8 @@
       "WebFetch(domain:erp.atlasgroup.si)",
       "mcp__ide__getDiagnostics",
       "Bash(node scripts/generate-icons.js:*)",
-      "Bash(npx shadcn@latest add popover -y)"
+      "Bash(npx shadcn@latest add popover -y)",
+      "Bash(if exist \"C:\\Users\\Sahin\\Desktop\\kasa-pro\\src\\app\\api\" rmdir /s /q \"C:\\Users\\Sahin\\Desktop\\kasa-pro\\src\\app\\api\")"
     ]
   }
 }

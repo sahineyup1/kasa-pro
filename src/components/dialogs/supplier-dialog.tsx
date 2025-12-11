@@ -143,6 +143,7 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
   const isEditMode = !!supplier;
 
   // VAT validation state
+  const [vatCountryCode, setVatCountryCode] = useState('SI');
   const [vatNumber, setVatNumber] = useState('');
   const [vatValidating, setVatValidating] = useState(false);
   const [vatResult, setVatResult] = useState<{
@@ -223,8 +224,20 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
 
         setNotes(getField(supplier, ['settings', 'notes'], 'notes', ''));
 
-        // VAT input for validation
-        setVatNumber(getField(supplier, ['tax', 'taxId'], 'taxId', ''));
+        // VAT input for validation - ülke kodu ve numarayı ayır
+        const fullVat = getField<string>(supplier, ['tax', 'taxId'], 'taxId', '');
+        if (fullVat && typeof fullVat === 'string' && fullVat.length >= 2) {
+          const countryPart = fullVat.substring(0, 2).toUpperCase();
+          const numberPart = fullVat.substring(2);
+          if (/^[A-Z]{2}$/.test(countryPart)) {
+            setVatCountryCode(countryPart);
+            setVatNumber(numberPart);
+          } else {
+            setVatNumber(fullVat);
+          }
+        } else if (fullVat) {
+          setVatNumber(String(fullVat));
+        }
 
         // Show previous VIES validation if exists
         if (getField(supplier, ['tax', 'vies_validated'], 'vies_validated', false)) {
@@ -260,96 +273,80 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
         setTransportFee('');
         setMinOrderAmount('');
         setNotes('');
+        setVatCountryCode('SI');
         setVatNumber('');
         setVatResult(null);
       }
     }
   }, [open, supplier]);
 
-  // VAT Validation (simulated - in production would call VIES API)
+  // VAT Validation
   const handleVatValidation = async () => {
-    if (!vatNumber.trim()) return;
+    if (!vatNumber.trim() || vatNumber.length < 6) return;
 
     setVatValidating(true);
     setVatResult(null);
 
     try {
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Ülke kodu + numara birleştir
+      const fullVatNumber = vatCountryCode + vatNumber.replace(/\s/g, '').toUpperCase();
+      const countryCode = vatCountryCode;
 
-      // Basic VAT format validation
-      const vatPattern = /^[A-Z]{2}[0-9A-Z]{8,12}$/;
-      const cleanVat = vatNumber.replace(/\s/g, '').toUpperCase();
+      // Call VIES service (uses CORS proxy)
+      const { validateVATNumber } = await import('@/lib/vies');
+      const result = await validateVATNumber(fullVatNumber);
 
-      if (!vatPattern.test(cleanVat)) {
+      if (result.valid) {
+        const companyName = result.companyName || '';
+        const companyAddress = result.companyAddress || '';
+
         setVatResult({
-          valid: false,
-          message: 'Gecersiz VAT numarasi formati. Ornek: SI12345678',
+          valid: true,
+          message: 'VAT numarasi dogrulandi',
+          companyName,
+          companyAddress,
         });
-        return;
-      }
 
-      // Extract country code
-      const countryCode = cleanVat.substring(0, 2);
+        // Auto-fill form with validated data
+        if (companyName) {
+          setName(companyName);
+          setShortName(companyName.substring(0, 30));
+        }
 
-      // Simulate successful validation with company data
-      const mockCompanyNames: Record<string, string> = {
-        'SI': 'Primer d.o.o.',
-        'AT': 'Muster GmbH',
-        'DE': 'Beispiel AG',
-        'IT': 'Esempio S.r.l.',
-        'HR': 'Primjer d.o.o.',
-      };
+        // Set country from VAT
+        const countryOption = COUNTRIES.find((c) => c.code === countryCode);
+        if (countryOption) {
+          setCountry(countryCode);
+        }
 
-      const mockAddresses: Record<string, string> = {
-        'SI': 'Slovenska cesta 123, 1000 Ljubljana',
-        'AT': 'Hauptstrasse 456, 1010 Wien',
-        'DE': 'Musterweg 789, 10115 Berlin',
-        'IT': 'Via Esempio 321, 00100 Roma',
-        'HR': 'Ulica Primjer 654, 10000 Zagreb',
-      };
-
-      setVatResult({
-        valid: true,
-        message: 'VAT numarasi dogrulandi',
-        companyName: mockCompanyNames[countryCode] || 'Test Company',
-        companyAddress: mockAddresses[countryCode] || 'Test Address',
-      });
-
-      // Auto-fill form with validated data
-      if (mockCompanyNames[countryCode]) {
-        setName(mockCompanyNames[countryCode]);
-        setShortName(mockCompanyNames[countryCode].substring(0, 30));
-      }
-
-      // Set country from VAT
-      const countryOption = COUNTRIES.find((c) => c.code === countryCode);
-      if (countryOption) {
-        setCountry(countryCode);
-      }
-
-      // Parse address
-      if (mockAddresses[countryCode]) {
-        const addressParts = mockAddresses[countryCode].split(', ');
-        if (addressParts.length >= 1) setStreet(addressParts[0]);
-        if (addressParts.length >= 2) {
-          const cityPart = addressParts[1];
-          const postalMatch = cityPart.match(/^(\d+)\s+(.+)$/);
-          if (postalMatch) {
-            setPostalCode(postalMatch[1]);
-            setCity(postalMatch[2]);
-          } else {
-            setCity(cityPart);
+        // Parse address
+        if (companyAddress) {
+          const addressParts = companyAddress.split(', ');
+          if (addressParts.length >= 1) setStreet(addressParts[0]);
+          if (addressParts.length >= 2) {
+            const cityPart = addressParts[addressParts.length - 1];
+            const postalMatch = cityPart.match(/^(\d+)\s+(.+)$/);
+            if (postalMatch) {
+              setPostalCode(postalMatch[1]);
+              setCity(postalMatch[2]);
+            } else {
+              setCity(cityPart);
+            }
           }
         }
-      }
 
-      // Set tax ID
-      setTaxId(cleanVat);
+        // Set tax ID
+        setTaxId(fullVatNumber);
 
-      // Set reverse charge for non-SI EU suppliers
-      if (countryCode !== 'SI') {
-        setReverseCharge(true);
+        // Set reverse charge for non-SI EU suppliers
+        if (countryCode !== 'SI') {
+          setReverseCharge(true);
+        }
+      } else {
+        setVatResult({
+          valid: false,
+          message: result.error || 'Gecersiz VAT numarasi - VIES sisteminde bulunamadi',
+        });
       }
     } catch (error) {
       setVatResult({
@@ -482,18 +479,41 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
             <p className="text-sm text-amber-700 mb-4">
               Sirket bilgilerini otomatik doldurmak icin AB VAT numarasi ile baslayin
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
+              {/* Ülke Seçimi */}
+              <Select
+                value={vatCountryCode}
+                onValueChange={(value) => {
+                  setVatCountryCode(value);
+                  setVatResult(null);
+                }}
+              >
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* VAT Numarası */}
               <div className="flex-1">
                 <Input
-                  placeholder="Orn: SI12345678, ATU12345678, DE123456789"
+                  placeholder="12345678"
                   value={vatNumber}
-                  onChange={(e) => setVatNumber(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setVatNumber(e.target.value.replace(/\s/g, '').toUpperCase());
+                    setVatResult(null);
+                  }}
                 />
               </div>
               <Button
                 onClick={handleVatValidation}
                 disabled={vatValidating || !vatNumber.trim()}
-                className="min-w-[160px]"
+                className="min-w-[130px]"
               >
                 {vatValidating ? (
                   <>
@@ -501,7 +521,7 @@ export function SupplierDialog({ open, onOpenChange, supplier, onSave }: Supplie
                     Dogrulaniyor...
                   </>
                 ) : (
-                  'VIES ile Dogrula'
+                  'Dogrula'
                 )}
               </Button>
             </div>

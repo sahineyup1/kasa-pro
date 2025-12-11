@@ -4,21 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Receipt,
   Car,
-  ShoppingCart,
   Fuel,
   Wrench,
   TrendingUp,
   TrendingDown,
-  Loader2,
-  Calendar,
   AlertTriangle,
   Users,
   Package,
   DollarSign,
-  CreditCard,
-  Banknote,
-  Building2,
-  FileText,
   Clock,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,7 +84,7 @@ interface RecentActivity {
 }
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
+  // Ana veriler için loading state yok - hemen göster, veriler geldikçe güncellensin
   const [stats, setStats] = useState<DashboardStats>({
     expenseCount: 0,
     expenseTotal: 0,
@@ -116,13 +109,15 @@ export default function DashboardPage() {
   const [expiryWarnings, setExpiryWarnings] = useState<{ plate: string; type: string; date: string }[]>([]);
   const [visaWarnings, setVisaWarnings] = useState<{ name: string; date: string; daysLeft: number }[]>([]);
 
+  // Hangi veriler yüklendi?
+  const [loadedSections, setLoadedSections] = useState({
+    expenses: false,
+    sales: false,
+    purchases: false,
+    employees: false,
+  });
+
   useEffect(() => {
-    let loadCount = 0;
-    const totalLoads = 8;
-    const checkLoaded = () => {
-      loadCount++;
-      if (loadCount >= totalLoads) setLoading(false);
-    };
 
     // Get current month names for charts
     const getMonthNames = () => {
@@ -187,7 +182,7 @@ export default function DashboardPage() {
           }
         });
       }
-      checkLoaded();
+      setLoadedSections(prev => ({ ...prev, expenses: true }));
     });
 
     // Araçları dinle
@@ -217,7 +212,6 @@ export default function DashboardPage() {
         });
         setExpiryWarnings(warnings);
       }
-      checkLoaded();
     });
 
     // Yakıt
@@ -227,7 +221,6 @@ export default function DashboardPage() {
         const total = list.reduce((sum, f) => sum + (f.totalAmount || 0), 0);
         setStats((prev) => ({ ...prev, fuelTotal: total }));
       }
-      checkLoaded();
     });
 
     // Bakım
@@ -237,7 +230,6 @@ export default function DashboardPage() {
         const total = list.reduce((sum, m) => sum + (m.cost || 0), 0);
         setStats((prev) => ({ ...prev, maintenanceTotal: total }));
       }
-      checkLoaded();
     });
 
     // Alış faturaları (Firestore - 'purchases' collection)
@@ -263,7 +255,7 @@ export default function DashboardPage() {
           }
         });
       }
-      checkLoaded();
+      setLoadedSections(prev => ({ ...prev, purchases: true }));
     });
 
     // Satış faturaları (Firestore)
@@ -288,7 +280,7 @@ export default function DashboardPage() {
         });
         setMonthlyData([...initMonthlyData]);
       }
-      checkLoaded();
+      setLoadedSections(prev => ({ ...prev, sales: true }));
     });
 
     // Personel
@@ -310,7 +302,6 @@ export default function DashboardPage() {
 
         // Vize uyarıları
         const now = new Date();
-        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
         const visaWarns: { name: string; date: string; daysLeft: number }[] = [];
 
         list.forEach((e: any) => {
@@ -326,7 +317,7 @@ export default function DashboardPage() {
         });
         setVisaWarnings(visaWarns.sort((a, b) => a.daysLeft - b.daysLeft));
       }
-      checkLoaded();
+      setLoadedSections(prev => ({ ...prev, employees: true }));
     });
 
     // Ürünler (RTDB)
@@ -336,7 +327,6 @@ export default function DashboardPage() {
         const lowStock = list.filter((p) => (p.stock || 0) < (p.minStock || 10)).length;
         setStats((prev) => ({ ...prev, productCount: list.length, lowStockProducts: lowStock }));
       }
-      checkLoaded();
     });
 
     return () => {
@@ -356,14 +346,13 @@ export default function DashboardPage() {
     return stats.saleInvoiceTotal - stats.purchaseInvoiceTotal - stats.expenseTotal;
   }, [stats]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Veriler yukleniyor...</span>
-      </div>
-    );
-  }
+  // Skeleton component for loading states
+  const CardSkeleton = () => (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+      <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+    </div>
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-6 bg-[#EAE8E3] min-h-screen">
@@ -436,8 +425,14 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-base sm:text-2xl font-bold text-emerald-600">{formatCurrency(stats.saleInvoiceTotal)}</div>
-            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{stats.saleInvoiceCount} fatura</p>
+            {!loadedSections.sales ? (
+              <CardSkeleton />
+            ) : (
+              <>
+                <div className="text-base sm:text-2xl font-bold text-emerald-600">{formatCurrency(stats.saleInvoiceTotal)}</div>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{stats.saleInvoiceCount} fatura</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -450,8 +445,14 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-base sm:text-2xl font-bold text-orange-600">{formatCurrency(stats.expenseTotal)}</div>
-            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{stats.expenseCount} kayit</p>
+            {!loadedSections.expenses ? (
+              <CardSkeleton />
+            ) : (
+              <>
+                <div className="text-base sm:text-2xl font-bold text-orange-600">{formatCurrency(stats.expenseTotal)}</div>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{stats.expenseCount} kayit</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -468,10 +469,16 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className={`text-base sm:text-2xl font-bold ${profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(Math.abs(profitLoss))}
-            </div>
-            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{profitLoss >= 0 ? 'Net kar' : 'Net zarar'}</p>
+            {!(loadedSections.sales && loadedSections.expenses && loadedSections.purchases) ? (
+              <CardSkeleton />
+            ) : (
+              <>
+                <div className={`text-base sm:text-2xl font-bold ${profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(Math.abs(profitLoss))}
+                </div>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-1">{profitLoss >= 0 ? 'Net kar' : 'Net zarar'}</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

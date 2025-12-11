@@ -22,43 +22,7 @@ import {
 import { pushData, updateData } from '@/services/firebase';
 import { Loader2, Building2, User, CreditCard, MapPin, Phone, Shield, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
-// VIES API validation function
-async function validateVATNumber(vatNumber: string): Promise<{
-  valid: boolean;
-  countryCode?: string;
-  vatNumber?: string;
-  companyName?: string;
-  companyAddress?: string;
-  error?: string;
-}> {
-  try {
-    // Extract country code and number
-    const countryCode = vatNumber.substring(0, 2).toUpperCase();
-    const number = vatNumber.substring(2).replace(/\s/g, '');
-
-    // Call VIES SOAP API via a simple approach
-    const response = await fetch('https://ec.europa.eu/taxation_customs/vies/rest-api/ms/' + countryCode + '/vat/' + number);
-
-    if (!response.ok) {
-      throw new Error('VIES API error');
-    }
-
-    const data = await response.json();
-
-    return {
-      valid: data.isValid === true,
-      countryCode: data.countryCode,
-      vatNumber: data.vatNumber,
-      companyName: data.name || '',
-      companyAddress: data.address || '',
-    };
-  } catch (error) {
-    return {
-      valid: false,
-      error: (error as Error).message || 'Dogrulama hatasi',
-    };
-  }
-}
+import { validateVATNumber } from '@/lib/vies';
 
 interface CustomerDialogProps {
   open: boolean;
@@ -124,6 +88,7 @@ export function CustomerDialog({
   const [country, setCountry] = useState('SI');
 
   // Financial
+  const [vatCountryCode, setVatCountryCode] = useState('SI');
   const [vatNumber, setVatNumber] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
   const [creditLimit, setCreditLimit] = useState('0');
@@ -158,7 +123,20 @@ export function CustomerDialog({
       setPostalCode(addressInfo.postalCode || customer.postalCode || '');
       setCountry(addressInfo.country || customer.country || 'SI');
 
-      setVatNumber(financial.vatNumber || customer.vatNumber || '');
+      // VAT numarasından ülke kodunu ayır
+      const fullVat = financial.vatNumber || customer.vatNumber || '';
+      if (fullVat && fullVat.length >= 2) {
+        const countryPart = fullVat.substring(0, 2).toUpperCase();
+        const numberPart = fullVat.substring(2);
+        if (/^[A-Z]{2}$/.test(countryPart)) {
+          setVatCountryCode(countryPart);
+          setVatNumber(numberPart);
+        } else {
+          setVatNumber(fullVat);
+        }
+      } else {
+        setVatNumber(fullVat);
+      }
       setTaxNumber(financial.taxNumber || customer.taxNumber || '');
       setCreditLimit(String(financial.creditLimit || customer.creditLimit || 0));
       setDiscount(String(financial.discount || customer.discount || 0));
@@ -180,6 +158,7 @@ export function CustomerDialog({
       setCity('');
       setPostalCode('');
       setCountry('SI');
+      setVatCountryCode('SI');
       setVatNumber('');
       setTaxNumber('');
       setCreditLimit('0');
@@ -192,8 +171,8 @@ export function CustomerDialog({
 
   // VIES VAT Validation
   const handleValidateVat = async () => {
-    if (!vatNumber.trim() || vatNumber.length < 4) {
-      alert('Gecerli bir VAT numarasi giriniz (ornek: SI12345678)');
+    if (!vatNumber.trim() || vatNumber.length < 6) {
+      alert('Gecerli bir VAT numarasi giriniz');
       return;
     }
 
@@ -201,8 +180,17 @@ export function CustomerDialog({
     setVatValidationResult(null);
 
     try {
-      const result = await validateVATNumber(vatNumber.trim());
+      // Ülke kodu + numara birleştir
+      const fullVatNumber = vatCountryCode + vatNumber.trim();
+      const result = await validateVATNumber(fullVatNumber);
       setVatValidationResult(result);
+
+      if (result.valid) {
+        // Set country from VAT
+        if (result.countryCode) {
+          setCountry(result.countryCode);
+        }
+      }
 
       if (result.valid && result.companyName) {
         // Auto-fill from VIES data
@@ -266,7 +254,7 @@ export function CustomerDialog({
           type,
           status,
           customerGroup,
-          vatNumber: vatNumber.trim(),
+          vatNumber: vatNumber.trim() ? vatCountryCode + vatNumber.trim() : '',
           vatValidated: vatValidationResult?.valid || false,
           vatCountry: vatValidationResult?.countryCode || '',
           vatCompanyName: vatValidationResult?.companyName || '',
@@ -343,14 +331,35 @@ export function CustomerDialog({
               EU VAT Dogrulama (VIES)
             </h3>
             <div className="flex gap-2">
+              {/* Ülke Seçimi */}
+              <Select
+                value={vatCountryCode}
+                onValueChange={(value) => {
+                  setVatCountryCode(value);
+                  setVatValidationResult(null);
+                }}
+                disabled={viewMode}
+              >
+                <SelectTrigger className="w-[130px] bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {countries.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* VAT Numarası */}
               <div className="flex-1">
                 <Input
                   value={vatNumber}
                   onChange={(e) => {
-                    setVatNumber(e.target.value.toUpperCase());
+                    setVatNumber(e.target.value.replace(/\s/g, '').toUpperCase());
                     setVatValidationResult(null);
                   }}
-                  placeholder="SI12345678, ATU12345678, DE123456789..."
+                  placeholder="12345678"
                   className="bg-white"
                   disabled={viewMode}
                 />
@@ -367,7 +376,7 @@ export function CustomerDialog({
                 ) : (
                   <Shield className="h-4 w-4 mr-2" />
                 )}
-                VIES Dogrula
+                Dogrula
               </Button>
             </div>
             {vatValidationResult && (

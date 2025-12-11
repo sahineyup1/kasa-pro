@@ -58,6 +58,10 @@ const COUNTRY_FLAGS: Record<string, string> = {
   'FR': '🇫🇷',
   'NL': '🇳🇱',
   'BE': '🇧🇪',
+  'TR': '🇹🇷',
+  'ES': '🇪🇸',
+  'GR': '🇬🇷',
+  'SK': '🇸🇰',
 };
 
 interface Supplier {
@@ -390,7 +394,7 @@ export default function SuppliersPage() {
               <SelectItem value="all">Tum ulkeler</SelectItem>
               {countries.map((country) => (
                 <SelectItem key={country} value={country}>
-                  {COUNTRY_FLAGS[country] || ''} {country}
+                  {COUNTRY_FLAGS[country] || country}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -480,7 +484,7 @@ export default function SuppliersPage() {
                         {typeLabels[type] || type}
                       </TableCell>
                       <TableCell>
-                        {COUNTRY_FLAGS[country] || ''} {country}
+                        {COUNTRY_FLAGS[country] || country}
                       </TableCell>
                       <TableCell className="text-gray-600">{contactPerson}</TableCell>
                       <TableCell className="text-gray-600">{phone}</TableCell>

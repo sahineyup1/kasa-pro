@@ -44,6 +44,25 @@ import { formatCurrency } from '@/lib/utils';
 import { subscribeToRTDB, removeData } from '@/services/firebase';
 import { CustomerDialog } from '@/components/dialogs/customer-dialog';
 
+// Country flags
+const COUNTRY_FLAGS: Record<string, string> = {
+  'SI': '🇸🇮',
+  'AT': '🇦🇹',
+  'DE': '🇩🇪',
+  'IT': '🇮🇹',
+  'HR': '🇭🇷',
+  'HU': '🇭🇺',
+  'CZ': '🇨🇿',
+  'PL': '🇵🇱',
+  'FR': '🇫🇷',
+  'NL': '🇳🇱',
+  'BE': '🇧🇪',
+  'TR': '🇹🇷',
+  'ES': '🇪🇸',
+  'GR': '🇬🇷',
+  'SK': '🇸🇰',
+};
+
 interface Customer {
   id: string;
   // Basic info
@@ -390,7 +409,7 @@ export default function CustomersPage() {
                 <TableHead>Müşteri Adı</TableHead>
                 <TableHead>Tür</TableHead>
                 <TableHead>İletişim</TableHead>
-                <TableHead>Şehir</TableHead>
+                <TableHead>Ülke / Şehir</TableHead>
                 <TableHead className="text-right">Bakiye</TableHead>
                 <TableHead>Durum</TableHead>
                 <TableHead className="w-[100px]">İşlem</TableHead>
@@ -414,7 +433,8 @@ export default function CustomersPage() {
                   const type = getField(customer, 'type') || 'company';
                   const email = getField(customer, 'email') || '';
                   const phone = getField(customer, 'phone') || getField(customer, 'mobile') || '';
-                  const city = getField(customer, 'city') || '-';
+                  const country = getField(customer, 'country') || '';
+                  const city = getField(customer, 'city') || '';
                   const balance = getField(customer, 'balance') || 0;
                   const status = getField(customer, 'status') || 'active';
 
@@ -449,7 +469,12 @@ export default function CustomersPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{city}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <span>{COUNTRY_FLAGS[country] || country}</span>
+                          <span>{city || '-'}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         <span className={balance < 0 ? 'text-red-600' : ''}>
                           {formatCurrency(balance)}

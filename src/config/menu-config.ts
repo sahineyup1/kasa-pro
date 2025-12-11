@@ -6,7 +6,6 @@
 import {
   LayoutDashboard,
   Bot,
-  Calculator,
   Wallet,
   Package,
   Users,
@@ -47,30 +46,27 @@ export interface MenuGroup {
 }
 
 // Rol bazlı ekran erişimleri - Python ERP ile AYNI
+// NOT: Kasiyer modülü web'den kaldırıldı - Python desktop'ta kalacak
 export const roleScreenAccess: Record<string, string[]> = {
   admin: [
-    'dashboard', 'ai_assistant', 'cashier', 'finance', 'products',
+    'dashboard', 'ai_assistant', 'finance', 'products',
     'invoice_management', 'account_management', 'warehouse_management',
     'expense_management', 'logistics', 'butcher', 'reports', 'delivery_notes',
     'whatsapp_orders', 'vehicles', 'employees', 'settings', 'accountant',
     'customers', 'suppliers', 'bank'
   ],
   depo_muduru: [
-    'dashboard', 'ai_assistant', 'cashier', 'finance', 'logistics', 'products',
+    'dashboard', 'ai_assistant', 'finance', 'logistics', 'products',
     'account_management', 'warehouse_management', 'delivery_notes', 'vehicles'
   ],
   depo: [
-    'dashboard', 'ai_assistant', 'cashier', 'finance', 'logistics', 'products',
+    'dashboard', 'ai_assistant', 'finance', 'logistics', 'products',
     'account_management', 'warehouse_management', 'delivery_notes'
   ],
   finans: [
-    'dashboard', 'ai_assistant', 'cashier', 'finance', 'products',
+    'dashboard', 'ai_assistant', 'finance', 'products',
     'invoice_management', 'warehouse_management', 'expense_management',
     'reports', 'bank', 'accountant'
-  ],
-  kasiyer: [
-    'dashboard', 'ai_assistant', 'cashier', 'finance', 'products',
-    'invoice_management', 'account_management', 'warehouse_management'
   ],
   sofor: [
     'dashboard', 'finance', 'products',
@@ -83,10 +79,10 @@ export const roleScreenAccess: Record<string, string[]> = {
 };
 
 // Ana menü tanımları - Python ERP sıralaması ile AYNI
+// NOT: Kasiyer menüden kaldırıldı - Python desktop'ta kalacak
 export const menuDefinitions: MenuItem[] = [
   { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { id: 'ai_assistant', title: 'AI Asistan', icon: Bot, href: '/dashboard/ai' },
-  { id: 'cashier', title: 'Kasiyer', icon: Calculator, href: '/dashboard/cashier' },
   { id: 'finance', title: 'Finans', icon: Wallet, href: '/dashboard/finance' },
   { id: 'products', title: 'Ürünler', icon: Package, href: '/dashboard/products' },
   {
@@ -137,7 +133,6 @@ export const menuGroups: MenuGroup[] = [
     title: 'Satış & Finans',
     defaultOpen: true,
     items: [
-      { id: 'cashier', title: 'Kasiyer', icon: Calculator, href: '/dashboard/cashier' },
       { id: 'finance', title: 'Finans', icon: Wallet, href: '/dashboard/finance' },
       {
         id: 'invoice_management',

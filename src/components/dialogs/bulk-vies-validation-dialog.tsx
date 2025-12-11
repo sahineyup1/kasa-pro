@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { updateData } from '@/services/firebase';
+import { validateVATNumber } from '@/lib/vies';
 import {
   Shield, Loader2, CheckCircle, XCircle, Clock, SkipForward, Play, Square
 } from 'lucide-react';
@@ -56,43 +57,6 @@ interface ValidationResult {
 }
 
 // =================== VIES API VALIDATION ===================
-
-async function validateVATNumber(vatNumber: string): Promise<{
-  valid: boolean;
-  countryCode?: string;
-  vatNumber?: string;
-  companyName?: string;
-  companyAddress?: string;
-  error?: string;
-}> {
-  try {
-    const countryCode = vatNumber.substring(0, 2).toUpperCase();
-    const number = vatNumber.substring(2).replace(/\s/g, '');
-
-    const response = await fetch(
-      `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/${countryCode}/vat/${number}`
-    );
-
-    if (!response.ok) {
-      throw new Error('VIES API error');
-    }
-
-    const data = await response.json();
-
-    return {
-      valid: data.isValid === true,
-      countryCode: data.countryCode,
-      vatNumber: data.vatNumber,
-      companyName: data.name || '',
-      companyAddress: data.address || '',
-    };
-  } catch (error) {
-    return {
-      valid: false,
-      error: (error as Error).message || 'Dogrulama hatasi',
-    };
-  }
-}
 
 // =================== STATUS BADGE ===================
 
