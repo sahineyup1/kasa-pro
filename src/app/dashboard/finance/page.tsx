@@ -955,9 +955,9 @@ export default function FinancePage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-8">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-8 mb-6">
+          <TabsList className="flex flex-wrap w-full mb-6 h-auto gap-1">
             <TabsTrigger value="dashboard">
               <TrendingUp className="h-4 w-4 mr-2" />
               Hazine Ozeti
@@ -995,7 +995,7 @@ export default function FinancePage() {
           {/* ==================== HAZINE OZETI TAB ==================== */}
           <TabsContent value="dashboard">
             {/* Summary Cards */}
-            <div className="grid grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-white rounded-lg border-l-4 border-l-green-500 p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -1068,7 +1068,7 @@ export default function FinancePage() {
             </div>
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Bank Accounts */}
               <div className="bg-white rounded-lg border">
                 <div className="p-4 border-b flex items-center justify-between">
@@ -1148,7 +1148,7 @@ export default function FinancePage() {
                   Bugunun Aktivitesi
                 </h3>
               </div>
-              <div className="p-4 grid grid-cols-3 gap-4">
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <ArrowUpRight className="h-8 w-8 text-green-600 mx-auto mb-2" />
                   <p className="text-sm text-gray-600">Girisler</p>
@@ -1177,7 +1177,7 @@ export default function FinancePage() {
           {/* ==================== ŞUBE KASALARI TAB ==================== */}
           <TabsContent value="branches">
             {/* Branch Summary */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-white rounded-lg border-l-4 border-l-purple-500 p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-purple-100 rounded-lg">
@@ -1328,7 +1328,7 @@ export default function FinancePage() {
                         {bankAccountsArray.length > 0 && (
                           <div className="mt-3 pt-3 border-t">
                             <p className="text-xs text-gray-500 mb-2">Banka Hesaplari:</p>
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                               {bankAccountsArray.map((acc) => {
                                 const isCredit = acc.accountType === 'credit_line' || acc.accountType === 'leasing';
                                 const balance = acc.balance?.currentBalance || 0;
@@ -1379,24 +1379,24 @@ export default function FinancePage() {
           <TabsContent value="kdv">
             {/* Tarih Filtresi ve Dagitim Toggle */}
             <div className="bg-white rounded-lg border mb-6 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                   <Label className="font-semibold">Donem:</Label>
                   <Input
                     type="date"
                     value={kdvStartDate}
                     onChange={(e) => setKdvStartDate(e.target.value)}
-                    className="w-40"
+                    className="w-36 sm:w-40"
                   />
                   <span className="text-gray-400">—</span>
                   <Input
                     type="date"
                     value={kdvEndDate}
                     onChange={(e) => setKdvEndDate(e.target.value)}
-                    className="w-40"
+                    className="w-36 sm:w-40"
                   />
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
                     <Switch
                       id="distribution"
@@ -1425,7 +1425,7 @@ export default function FinancePage() {
                   Genel giderler (€{kdvStats.distribution.genelExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 2 })})
                   ve alislar satis oranina gore subelere dagitildi.
                 </p>
-                <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {Object.entries(kdvStats.distribution.salesRatios).map(([bid, ratio]) => (
                     <div key={bid} className="bg-white rounded p-2 text-center">
                       <span className="font-medium">{KDV_BRANCHES[bid]?.icon} {KDV_BRANCHES[bid]?.name}</span>
@@ -1437,7 +1437,7 @@ export default function FinancePage() {
             )}
 
             {/* Toplam DDV Ozeti */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-white rounded-lg border-l-4 border-l-green-500 p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -1508,14 +1508,14 @@ export default function FinancePage() {
             </div>
 
             {/* Sube Bazli DDV Tablosu */}
-            <div className="bg-white rounded-lg border">
+            <div className="bg-white rounded-lg border overflow-x-auto">
               <div className="p-4 border-b">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Percent className="h-5 w-5" />
                   Sube Bazli DDV Detayi
                 </h3>
               </div>
-              <Table>
+              <Table className="min-w-[800px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Sube</TableHead>
@@ -1622,10 +1622,10 @@ export default function FinancePage() {
           <TabsContent value="cash">
             {/* Branch Selector */}
             <div className="bg-white rounded-lg border mb-6 p-4">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <Label className="font-semibold">Sube Sec:</Label>
                 <Select value={selectedKasaBranch} onValueChange={setSelectedKasaBranch}>
-                  <SelectTrigger className="w-64">
+                  <SelectTrigger className="w-full sm:w-64">
                     <SelectValue placeholder="Sube secin..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1657,14 +1657,14 @@ export default function FinancePage() {
                 <>
                   {/* Cash Status Card */}
                   <div className="bg-white rounded-lg border mb-6">
-                    <div className="p-6">
-                      <div className="flex items-center justify-between">
+                    <div className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className={`p-4 rounded-full ${isOpen ? 'bg-green-100' : 'bg-gray-100'}`}>
-                            <Wallet className={`h-8 w-8 ${isOpen ? 'text-green-600' : 'text-gray-400'}`} />
+                          <div className={`p-3 sm:p-4 rounded-full ${isOpen ? 'bg-green-100' : 'bg-gray-100'}`}>
+                            <Wallet className={`h-6 w-6 sm:h-8 sm:w-8 ${isOpen ? 'text-green-600' : 'text-gray-400'}`} />
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold">{branch.name} - Kasa</h3>
+                            <h3 className="text-base sm:text-lg font-semibold">{branch.name} - Kasa</h3>
                             <p className="text-sm text-gray-500">
                               {isOpen
                                 ? `Acilis: ${cashReg?.audit?.openedAt ? new Date(cashReg.audit.openedAt).toLocaleString('tr-TR') : '-'}`
@@ -1676,9 +1676,9 @@ export default function FinancePage() {
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <p className="text-sm text-gray-500">Guncel Bakiye</p>
-                          <p className={`text-3xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <p className={`text-2xl sm:text-3xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             €{balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </p>
                           {cashReg?.balance?.openingBalance !== undefined && (
@@ -1692,7 +1692,7 @@ export default function FinancePage() {
                   </div>
 
                   {/* Balance Details */}
-                  <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white rounded-lg border p-4">
                       <p className="text-sm text-gray-500">Acilis Bakiyesi</p>
                       <p className="text-xl font-semibold">
@@ -1776,10 +1776,10 @@ export default function FinancePage() {
           <TabsContent value="bank">
             {/* Branch Selector */}
             <div className="bg-white rounded-lg border mb-6 p-4">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <Label className="font-semibold">Sube Sec:</Label>
                 <Select value={selectedBankaBranch} onValueChange={setSelectedBankaBranch}>
-                  <SelectTrigger className="w-64">
+                  <SelectTrigger className="w-full sm:w-64">
                     <SelectValue placeholder="Sube secin..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1823,20 +1823,20 @@ export default function FinancePage() {
               return (
                 <>
                   {/* Bank Summary Card */}
-                  <div className="bg-white rounded-lg border mb-6 p-6">
-                    <div className="flex items-center justify-between">
+                  <div className="bg-white rounded-lg border mb-6 p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="p-4 rounded-full bg-amber-100">
-                          <Building2 className="h-8 w-8 text-amber-600" />
+                        <div className="p-3 sm:p-4 rounded-full bg-amber-100">
+                          <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold">{branch.name} - Banka Hesaplari</h3>
+                          <h3 className="text-base sm:text-lg font-semibold">{branch.name} - Banka Hesaplari</h3>
                           <p className="text-sm text-gray-500">{branchBankAccounts.length} hesap</p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <p className="text-sm text-gray-500">Toplam Bakiye</p>
-                        <p className={`text-3xl font-bold ${totalBalance >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                        <p className={`text-2xl sm:text-3xl font-bold ${totalBalance >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
                           €{totalBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
@@ -1844,7 +1844,7 @@ export default function FinancePage() {
                   </div>
 
                   {/* Bank Accounts Grid */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                     {branchBankAccounts.map((account) => {
                       const isCredit = account.accountType === 'credit_line' || account.accountType === 'leasing';
                       const balance = account.balance?.currentBalance || 0;
@@ -1962,25 +1962,25 @@ export default function FinancePage() {
           {/* ==================== KREDILER TAB ==================== */}
           <TabsContent value="credits">
             {/* Credit Summary */}
-            <div className="bg-white rounded-lg border mb-6 p-6">
-              <div className="flex items-center justify-between">
+            <div className="bg-white rounded-lg border mb-6 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="p-4 rounded-full bg-red-100">
-                    <CreditCard className="h-8 w-8 text-red-600" />
+                  <div className="p-3 sm:p-4 rounded-full bg-red-100">
+                    <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold">Toplam Kredi Borcu</h3>
+                    <h3 className="text-base sm:text-lg font-semibold">Toplam Kredi Borcu</h3>
                     <p className="text-sm text-gray-500">{stats.activeCredits} aktif kredi</p>
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-red-600">
+                <p className="text-2xl sm:text-3xl font-bold text-red-600">
                   €{stats.totalCreditDebt.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
 
             {/* Credit Actions & Filters */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex gap-4">
                 <Button onClick={() => {
                   setSelectedCredit(null);
@@ -1992,7 +1992,7 @@ export default function FinancePage() {
               </div>
 
               <Select value={creditStatusFilter} onValueChange={setCreditStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Durum" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2004,7 +2004,7 @@ export default function FinancePage() {
             </div>
 
             {/* Credits Table */}
-            <div className="bg-white rounded-lg border">
+            <div className="bg-white rounded-lg border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -2083,8 +2083,8 @@ export default function FinancePage() {
           {/* ==================== ISLEMLER TAB ==================== */}
           <TabsContent value="transactions">
             {/* Filters */}
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1 max-w-md">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mb-4">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Islem ara..."
@@ -2098,11 +2098,11 @@ export default function FinancePage() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-[180px]"
+                className="w-full sm:w-[180px]"
               />
 
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Tip" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2116,7 +2116,7 @@ export default function FinancePage() {
               </Select>
 
               <Select value={accountFilter} onValueChange={setAccountFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Hesap" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2126,14 +2126,14 @@ export default function FinancePage() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" onClick={handleMaliMusavirExport}>
+              <Button variant="outline" onClick={handleMaliMusavirExport} className="w-full sm:w-auto">
                 <Download className="h-4 w-4 mr-2" />
                 Excel
               </Button>
             </div>
 
             {/* Transactions Table */}
-            <div className="bg-white rounded-lg border">
+            <div className="bg-white rounded-lg border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -2248,7 +2248,7 @@ export default function FinancePage() {
               {/* What's Included */}
               <div className="max-w-2xl mx-auto mb-8">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Rapor Icerigi (6 Sayfa)</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <span className="text-sm">Ozet - Hazine durumu ve donem ozeti</span>
@@ -2279,7 +2279,7 @@ export default function FinancePage() {
               {/* Current Summary */}
               <div className="max-w-2xl mx-auto mb-8 p-4 bg-amber-50 rounded-lg">
                 <h3 className="text-sm font-medium text-amber-900 mb-3">Mevcut Veriler</h3>
-                <div className="grid grid-cols-4 gap-4 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                   <div>
                     <p className="text-2xl font-bold text-amber-600">{transactions.length}</p>
                     <p className="text-xs text-amber-700">Islem</p>

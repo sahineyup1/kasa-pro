@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   FileSpreadsheet, Upload, CheckCircle, XCircle, AlertTriangle,
-  Store, Building2, Truck, Package, RefreshCw, Plus
+  Store, Building2, Truck, Package, RefreshCw, Plus, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -507,6 +507,54 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
     }
   };
 
+  // Download Excel template
+  const downloadTemplate = () => {
+    try {
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+
+      // Template headers
+      const headers = ['Tedarikci Kodu', 'Bizim Sifra', 'Urun Adi', 'Miktar', 'Birim', 'Birim Fiyat', 'KDV %'];
+
+      // Example data
+      const exampleData = [
+        ['P001', 'URN-001', 'Dana Kiyma', 10, 'KG', 12.50, 9.5],
+        ['P002', 'URN-002', 'Sut 1L', 20, 'AD', 1.50, 9.5],
+        ['P003', 'URN-003', 'Ekmek', 50, 'AD', 0.80, 9.5],
+      ];
+
+      // Create worksheet data with headers and examples
+      const wsData = [headers, ...exampleData];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 18 }, // Tedarikci Kodu
+        { wch: 15 }, // Bizim Sifra
+        { wch: 30 }, // Urun Adi
+        { wch: 10 }, // Miktar
+        { wch: 8 },  // Birim
+        { wch: 12 }, // Birim Fiyat
+        { wch: 8 },  // KDV %
+      ];
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Alis Faturasi');
+
+      // Generate filename with date
+      const today = new Date().toISOString().split('T')[0];
+      const filename = `Alis_Faturasi_Sablonu_${today}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(wb, filename);
+
+      toast.success('Excel sablonu indirildi: ' + filename);
+    } catch (error) {
+      console.error('Template download error:', error);
+      toast.error('Sablon indirme hatasi: ' + (error as Error).message);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -624,6 +672,32 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
         {/* Step: Upload */}
         {step === 'upload' && (
           <div className="space-y-6 py-4">
+            {/* Template Download Section */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet className="h-8 w-8 text-blue-600" />
+                    <div>
+                      <p className="font-medium text-blue-900">Excel Sablonu</p>
+                      <p className="text-sm text-blue-700">
+                        Dogru formatta veri yuklemek icin sablonu indirin
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={downloadTemplate}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Sablon Indir
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* File Upload Section */}
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-lg font-medium mb-2">Excel Dosyasi Secin</p>
