@@ -28,7 +28,9 @@ import {
   FileText,
   Tag,
   Zap,
+  Shield,
 } from 'lucide-react';
+import { validateVATNumber } from '@/lib/vies';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1254,6 +1256,25 @@ function VouchersTab({
   );
 }
 
+// EU Ulke listesi - VIES icin
+const EU_COUNTRIES = [
+  { code: 'SI', name: 'Slovenya' },
+  { code: 'AT', name: 'Avusturya' },
+  { code: 'DE', name: 'Almanya' },
+  { code: 'IT', name: 'Italya' },
+  { code: 'HR', name: 'Hirvatistan' },
+  { code: 'HU', name: 'Macaristan' },
+  { code: 'CZ', name: 'Cekya' },
+  { code: 'SK', name: 'Slovakya' },
+  { code: 'PL', name: 'Polonya' },
+  { code: 'FR', name: 'Fransa' },
+  { code: 'NL', name: 'Hollanda' },
+  { code: 'BE', name: 'Belcika' },
+  { code: 'ES', name: 'Ispanya' },
+  { code: 'PT', name: 'Portekiz' },
+  { code: 'GR', name: 'Yunanistan' },
+];
+
 // ==================== VENDOR DIALOG ====================
 function VendorDialog({
   open,
@@ -1276,31 +1297,111 @@ function VendorDialog({
     ocrKeywords: '',
   });
 
+  // VIES Validation state
+  const [vatCountryCode, setVatCountryCode] = useState('SI');
+  const [vatNumber, setVatNumber] = useState('');
+  const [validatingVat, setValidatingVat] = useState(false);
+  const [vatResult, setVatResult] = useState<{
+    valid: boolean;
+    companyName?: string;
+    companyAddress?: string;
+    error?: string;
+  } | null>(null);
+
   useEffect(() => {
-    if (vendor) {
-      setFormData({
-        name: vendor.name || '',
-        category: vendor.category || 'other',
-        taxId: vendor.taxId || '',
-        ddvNumber: vendor.ddvNumber || '',
-        address: vendor.address || '',
-        phone: vendor.phone || '',
-        email: vendor.email || '',
-        ocrKeywords: (vendor.ocrKeywords || []).join(', '),
-      });
-    } else {
-      setFormData({
-        name: '',
-        category: 'other',
-        taxId: '',
-        ddvNumber: '',
-        address: '',
-        phone: '',
-        email: '',
-        ocrKeywords: '',
-      });
+    if (open) {
+      if (vendor) {
+        setFormData({
+          name: vendor.name || '',
+          category: vendor.category || 'other',
+          taxId: vendor.taxId || '',
+          ddvNumber: vendor.ddvNumber || '',
+          address: vendor.address || '',
+          phone: vendor.phone || '',
+          email: vendor.email || '',
+          ocrKeywords: (vendor.ocrKeywords || []).join(', '),
+        });
+        // VAT numarasından ülke kodunu ayır
+        const fullVat = vendor.ddvNumber || vendor.taxId || '';
+        if (fullVat && fullVat.length >= 2) {
+          const countryPart = fullVat.substring(0, 2).toUpperCase();
+          const numberPart = fullVat.substring(2);
+          if (/^[A-Z]{2}$/.test(countryPart)) {
+            setVatCountryCode(countryPart);
+            setVatNumber(numberPart);
+          } else {
+            setVatNumber(fullVat);
+          }
+        }
+      } else {
+        setFormData({
+          name: '',
+          category: 'other',
+          taxId: '',
+          ddvNumber: '',
+          address: '',
+          phone: '',
+          email: '',
+          ocrKeywords: '',
+        });
+        setVatCountryCode('SI');
+        setVatNumber('');
+      }
+      setVatResult(null);
     }
   }, [vendor, open]);
+
+  // VIES VAT Validation
+  const handleValidateVat = async () => {
+    if (!vatNumber.trim() || vatNumber.length < 6) {
+      toast.error('Gecerli bir VAT numarasi giriniz');
+      return;
+    }
+
+    setValidatingVat(true);
+    setVatResult(null);
+
+    try {
+      const fullVatNumber = vatCountryCode + vatNumber.trim().toUpperCase();
+      const result = await validateVATNumber(fullVatNumber);
+
+      setVatResult({
+        valid: result.valid,
+        companyName: result.companyName,
+        companyAddress: result.companyAddress,
+        error: result.error,
+      });
+
+      if (result.valid) {
+        // Otomatik form doldurma
+        const newFormData = { ...formData };
+
+        // DDV numarasını set et
+        newFormData.ddvNumber = fullVatNumber;
+        newFormData.taxId = fullVatNumber;
+
+        // Şirket adını set et
+        if (result.companyName && !formData.name.trim()) {
+          newFormData.name = result.companyName;
+        }
+
+        // Adresi set et
+        if (result.companyAddress && !formData.address.trim()) {
+          newFormData.address = result.companyAddress.replace(/\n/g, ', ');
+        }
+
+        setFormData(newFormData);
+        toast.success('VAT numarasi dogrulandi');
+      }
+    } catch (error) {
+      setVatResult({
+        valid: false,
+        error: (error as Error).message || 'Dogrulama hatasi',
+      });
+    } finally {
+      setValidatingVat(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
@@ -1318,14 +1419,16 @@ function VendorDialog({
           .filter(k => k),
         isActive: true,
         updatedAt: new Date().toISOString(),
+        // VIES doğrulama bilgileri
+        viesValidated: vatResult?.valid || false,
+        viesValidatedAt: vatResult?.valid ? new Date().toISOString() : null,
+        viesCompanyName: vatResult?.companyName || null,
       };
 
       if (vendor) {
-        // Update existing vendor in RTDB
         await updateData(`expense_vendors/${vendor.id}`, data);
         toast.success('Masraf carisi guncellendi');
       } else {
-        // Create new vendor in RTDB
         await pushData('expense_vendors', {
           ...data,
           createdAt: new Date().toISOString(),
@@ -1344,7 +1447,7 @@ function VendorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {vendor ? 'Masraf Carisi Duzenle' : 'Yeni Masraf Carisi'}
@@ -1352,6 +1455,92 @@ function VendorDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* VIES Doğrulama Bölümü */}
+          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <h3 className="text-sm font-medium flex items-center gap-2 text-amber-800 mb-3">
+              <Shield className="h-4 w-4" />
+              EU VAT Dogrulama (VIES)
+            </h3>
+            <div className="flex gap-2">
+              <Select
+                value={vatCountryCode}
+                onValueChange={(v) => {
+                  setVatCountryCode(v);
+                  setVatResult(null);
+                }}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EU_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={vatNumber}
+                onChange={(e) => {
+                  setVatNumber(e.target.value.replace(/\s/g, '').toUpperCase());
+                  setVatResult(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (vatNumber.trim() && !validatingVat) {
+                      handleValidateVat();
+                    }
+                  }
+                }}
+                placeholder="12345678"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleValidateVat}
+                disabled={validatingVat || !vatNumber.trim()}
+              >
+                {validatingVat ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Shield className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            {vatResult && (
+              <div className={`mt-3 p-3 rounded-lg text-sm ${
+                vatResult.valid
+                  ? 'bg-green-100 text-green-800 border border-green-200'
+                  : 'bg-red-100 text-red-800 border border-red-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {vatResult.valid ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  <span className="font-medium">
+                    {vatResult.valid ? 'VAT Numarasi Gecerli' : 'VAT Numarasi Gecersiz'}
+                  </span>
+                </div>
+                {vatResult.companyName && (
+                  <div className="mt-2 text-xs">
+                    <div><strong>Sirket:</strong> {vatResult.companyName}</div>
+                    {vatResult.companyAddress && (
+                      <div><strong>Adres:</strong> {vatResult.companyAddress}</div>
+                    )}
+                  </div>
+                )}
+                {vatResult.error && (
+                  <div className="mt-1 text-xs">{vatResult.error}</div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label>Cari Adi *</Label>
             <Input
@@ -1384,7 +1573,7 @@ function VendorDialog({
               <Label>DDV No</Label>
               <Input
                 value={formData.ddvNumber}
-                onChange={(e) => setFormData({ ...formData, ddvNumber: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, ddvNumber: e.target.value.toUpperCase() })}
                 placeholder="SI12345678"
               />
             </div>
