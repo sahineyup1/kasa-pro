@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calculator, Plus } from 'lucide-react';
+import { Calculator, Plus, Shield, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { validateVATNumber } from '@/lib/vies';
 import {
   Select,
   SelectContent,
@@ -67,6 +68,25 @@ const PAYMENT_METHODS = [
   { value: 'check', label: 'Cek' },
 ];
 
+// EU Ulke listesi - VIES icin
+const EU_COUNTRIES = [
+  { code: 'SI', name: 'Slovenya' },
+  { code: 'AT', name: 'Avusturya' },
+  { code: 'DE', name: 'Almanya' },
+  { code: 'IT', name: 'Italya' },
+  { code: 'HR', name: 'Hirvatistan' },
+  { code: 'HU', name: 'Macaristan' },
+  { code: 'CZ', name: 'Cekya' },
+  { code: 'SK', name: 'Slovakya' },
+  { code: 'PL', name: 'Polonya' },
+  { code: 'FR', name: 'Fransa' },
+  { code: 'NL', name: 'Hollanda' },
+  { code: 'BE', name: 'Belcika' },
+  { code: 'ES', name: 'Ispanya' },
+  { code: 'PT', name: 'Portekiz' },
+  { code: 'GR', name: 'Yunanistan' },
+];
+
 interface ExpenseVendor {
   id: string;
   name: string;
@@ -125,6 +145,17 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
   // Vendor add
   const [newVendorName, setNewVendorName] = useState('');
   const [addingVendor, setAddingVendor] = useState(false);
+
+  // VIES Validation state for new vendor
+  const [vatCountryCode, setVatCountryCode] = useState('SI');
+  const [vatNumber, setVatNumber] = useState('');
+  const [validatingVat, setValidatingVat] = useState(false);
+  const [vatResult, setVatResult] = useState<{
+    valid: boolean;
+    companyName?: string;
+    companyAddress?: string;
+    error?: string;
+  } | null>(null);
 
   // Load vendors from RTDB (same as Python desktop app: erp/expense_vendors)
   useEffect(() => {
@@ -247,16 +278,59 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
     }
   }, [open, expense]);
 
+  // VIES VAT Validation for new vendor
+  const handleValidateVat = async () => {
+    if (!vatNumber.trim() || vatNumber.length < 6) {
+      alert('Gecerli bir VAT numarasi giriniz');
+      return;
+    }
+
+    setValidatingVat(true);
+    setVatResult(null);
+
+    try {
+      const fullVatNumber = vatCountryCode + vatNumber.trim().toUpperCase();
+      const result = await validateVATNumber(fullVatNumber);
+
+      setVatResult({
+        valid: result.valid,
+        companyName: result.companyName,
+        companyAddress: result.companyAddress,
+        error: result.error,
+      });
+
+      if (result.valid && result.companyName) {
+        // Otomatik isim doldur
+        setNewVendorName(result.companyName);
+      }
+    } catch (error) {
+      setVatResult({
+        valid: false,
+        error: (error as Error).message || 'Dogrulama hatasi',
+      });
+    } finally {
+      setValidatingVat(false);
+    }
+  };
+
   // Add new vendor
   const handleAddVendor = async () => {
     if (!newVendorName.trim()) return;
 
     setAddingVendor(true);
     try {
+      const fullVatNumber = vatNumber.trim() ? vatCountryCode + vatNumber.trim().toUpperCase() : '';
       const vendorData = {
         name: newVendorName.trim(),
         category: category || 'other',
+        ddvNumber: fullVatNumber,
+        taxId: fullVatNumber,
+        address: vatResult?.companyAddress?.replace(/\n/g, ', ') || '',
         isActive: true,
+        // VIES doğrulama bilgileri
+        viesValidated: vatResult?.valid || false,
+        viesValidatedAt: vatResult?.valid ? new Date().toISOString() : null,
+        viesCompanyName: vatResult?.companyName || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -264,6 +338,8 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
       if (newId) {
         setVendorId(newId);
         setNewVendorName('');
+        setVatNumber('');
+        setVatResult(null);
       }
     } catch (error) {
       console.error('Add vendor error:', error);
@@ -496,12 +572,93 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
                 </Select>
               </div>
 
-              {/* Yeni cari ekle */}
-              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-                <p className="text-xs text-muted-foreground">veya yeni cari ekle:</p>
+              {/* Yeni cari ekle - VIES ile */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-600" />
+                  <p className="text-xs font-medium text-amber-800">Yeni cari ekle (VIES ile dogrula)</p>
+                </div>
+
+                {/* VIES Dogrulama */}
+                <div className="flex gap-2">
+                  <Select
+                    value={vatCountryCode}
+                    onValueChange={(v) => {
+                      setVatCountryCode(v);
+                      setVatResult(null);
+                    }}
+                  >
+                    <SelectTrigger className="w-[80px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EU_COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="VAT numarasi"
+                    value={vatNumber}
+                    onChange={(e) => {
+                      setVatNumber(e.target.value.replace(/\s/g, '').toUpperCase());
+                      setVatResult(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (vatNumber.trim() && !validatingVat) {
+                          handleValidateVat();
+                        }
+                      }
+                    }}
+                    className="flex-1 h-8"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleValidateVat}
+                    disabled={validatingVat || !vatNumber.trim()}
+                    className="h-8"
+                  >
+                    {validatingVat ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Shield className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+
+                {/* VIES Sonucu */}
+                {vatResult && (
+                  <div className={`p-2 rounded text-xs ${
+                    vatResult.valid
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    <div className="flex items-center gap-1">
+                      {vatResult.valid ? (
+                        <CheckCircle className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      <span className="font-medium">
+                        {vatResult.valid ? 'Gecerli' : 'Gecersiz'}
+                      </span>
+                    </div>
+                    {vatResult.companyName && (
+                      <div className="mt-1">{vatResult.companyName}</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cari Adi ve Ekle */}
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Yeni cari adi"
+                    placeholder="Cari adi"
                     value={newVendorName}
                     onChange={(e) => setNewVendorName(e.target.value)}
                     className="h-8"
@@ -518,8 +675,13 @@ export function ExpenseDialog({ open, onOpenChange, expense, onSave }: ExpenseDi
                     variant="secondary"
                     onClick={handleAddVendor}
                     disabled={!newVendorName.trim() || addingVendor}
+                    className="h-8"
                   >
-                    <Plus className="h-4 w-4 mr-1" />
+                    {addingVendor ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-1" />
+                    )}
                     Ekle
                   </Button>
                 </div>
