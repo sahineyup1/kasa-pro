@@ -1,7 +1,10 @@
 /**
  * VIES VAT Validation Service
- * EU VIES REST API ile doğrulama yapar
+ * PHP proxy üzerinden EU VIES API'ye bağlanır
  */
+
+// PHP proxy URL - cPanel'de barındırılıyor
+const VIES_PROXY_URL = 'https://erp.atlasgroup.si/vies-proxy.php';
 
 interface ValidationResult {
   valid: boolean;
@@ -13,7 +16,7 @@ interface ValidationResult {
 }
 
 /**
- * VAT numarasını VIES REST API üzerinden doğrular
+ * VAT numarasını VIES API üzerinden doğrular (PHP proxy ile)
  */
 export async function validateVATNumber(vatNumber: string): Promise<ValidationResult> {
   try {
@@ -32,9 +35,9 @@ export async function validateVATNumber(vatNumber: string): Promise<ValidationRe
       };
     }
 
-    // VIES REST API
+    // PHP proxy üzerinden VIES API çağrısı
     const response = await fetch(
-      `https://ec.europa.eu/taxation_customs/vies/rest-api/ms/${countryCode}/vat/${number}`,
+      `${VIES_PROXY_URL}?country=${countryCode}&vat=${number}`,
       {
         method: 'GET',
         headers: {
