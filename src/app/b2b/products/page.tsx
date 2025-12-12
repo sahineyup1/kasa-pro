@@ -9,10 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Search, ShoppingCart, Plus, Minus, Package, Grid, List, X,
-  Filter, ChevronDown, Loader2, ZoomIn, AlertCircle, Check,
-  Beef, Milk, Wheat, Droplets, Flame, Leaf, Fish, Coffee,
-  Apple, Cookie, Wine, CircleDot
+  Filter, ChevronDown, Loader2, ZoomIn, AlertCircle, Check
 } from 'lucide-react';
+import {
+  CATEGORIES,
+  getB2BCategoryList,
+  getCategoryInfo,
+  matchesCategory as matchesCategoryFilter,
+} from '@/services/categories';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
@@ -48,22 +52,8 @@ interface CartItem {
   vatRate: number;
 }
 
-// Category config with icons
-const CATEGORIES: Record<string, { name: string; icon: any; color: string; bgColor: string }> = {
-  'all': { name: 'Tum Urunler', icon: Grid, color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  'MEAT': { name: 'Et', icon: Beef, color: 'text-red-600', bgColor: 'bg-red-50' },
-  'DAIRY': { name: 'Sut Urunleri', icon: Milk, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-  'STAPLES': { name: 'Temel Gida', icon: Wheat, color: 'text-amber-600', bgColor: 'bg-amber-50' },
-  'OIL': { name: 'Yag', icon: Droplets, color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
-  'SPICES': { name: 'Baharat', icon: Flame, color: 'text-orange-600', bgColor: 'bg-orange-50' },
-  'VEGETABLES': { name: 'Sebze', icon: Leaf, color: 'text-green-600', bgColor: 'bg-green-50' },
-  'SEAFOOD': { name: 'Deniz Urunleri', icon: Fish, color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
-  'BEVERAGES': { name: 'Icecekler', icon: Coffee, color: 'text-brown-600', bgColor: 'bg-stone-50' },
-  'FRESH': { name: 'Taze', icon: Apple, color: 'text-pink-600', bgColor: 'bg-pink-50' },
-  'SNACKS': { name: 'Atistirmalik', icon: Cookie, color: 'text-purple-600', bgColor: 'bg-purple-50' },
-  'SAUCE': { name: 'Soslar', icon: Wine, color: 'text-rose-600', bgColor: 'bg-rose-50' },
-  'OTHER_ITEMS': { name: 'Diger', icon: CircleDot, color: 'text-slate-600', bgColor: 'bg-slate-50' },
-};
+// Slovence kategori listesi (merkezi servis'ten)
+const B2B_CATEGORIES = getB2BCategoryList('sl');
 
 const CART_KEY = 'b2b_cart';
 
@@ -252,12 +242,18 @@ export default function B2BProductsPage() {
     return true;
   };
 
-  // Kategori sayıları
+  // Kategori sayıları - ana kategorilere göre grupla
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: products.length };
     products.forEach(p => {
-      const cat = p.category || 'OTHER_ITEMS';
-      counts[cat] = (counts[cat] || 0) + 1;
+      const cat = p.category || 'OTHER';
+      // Ana kategori sayısı
+      const mainCat = cat.includes('.') ? cat.split('.')[0] : cat;
+      counts[mainCat] = (counts[mainCat] || 0) + 1;
+      // Alt kategori sayısı
+      if (cat.includes('.')) {
+        counts[cat] = (counts[cat] || 0) + 1;
+      }
     });
     return counts;
   }, [products]);
@@ -274,18 +270,17 @@ export default function B2BProductsPage() {
         product.stockCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.barcode?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        product.category === selectedCategory;
+      // Merkezi kategori eşleştirme
+      const categoryMatches = matchesCategoryFilter(product.category || '', selectedCategory);
 
-      return matchesSearch && matchesCategory;
+      return matchesSearch && categoryMatches;
     });
   }, [products, searchTerm, selectedCategory, customerType]);
 
   // Sepete ekle
   const addToCart = (product: Product, quantity: number = 1) => {
     if (quantity <= 0) {
-      toast.error('Gecerli bir miktar girin');
+      toast.error('Vnesite veljavno količino');
       return;
     }
 
@@ -317,7 +312,7 @@ export default function B2BProductsPage() {
     setQuantities((prev) => ({ ...prev, [product.id]: 1 }));
     setAddedToCart(product.id);
     setTimeout(() => setAddedToCart(null), 1500);
-    toast.success(`${product.name} sepete eklendi`);
+    toast.success(`${product.name} dodano v košarico`);
   };
 
   // Miktar güncelle
@@ -333,22 +328,29 @@ export default function B2BProductsPage() {
   const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const cartCount = cart.length;
 
-  // Stok durumu badge
+  // Stok durumu badge (Slovence)
   const getStockBadge = (product: Product) => {
     const stock = product.currentStock || 0;
     const minStock = product.minStock || 0;
 
     if (stock <= 0) {
-      return { label: 'Stokta Yok', color: 'bg-red-100 text-red-700 border-red-200' };
+      return { label: 'Ni na zalogi', color: 'bg-red-100 text-red-700 border-red-200' };
     }
     if (stock <= minStock) {
-      return { label: 'Az Stok', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+      return { label: 'Malo zaloge', color: 'bg-amber-100 text-amber-700 border-amber-200' };
     }
-    return { label: 'Stokta', color: 'bg-green-100 text-green-700 border-green-200' };
+    return { label: 'Na zalogi', color: 'bg-green-100 text-green-700 border-green-200' };
   };
 
-  const getCategoryInfo = (categoryId: string) => {
-    return CATEGORIES[categoryId] || CATEGORIES['OTHER_ITEMS'];
+  // Kategori bilgisi al (Slovence)
+  const getCatInfo = (categoryId: string) => {
+    const info = getCategoryInfo(categoryId, 'sl');
+    return {
+      name: info.displayName,
+      icon: info.icon,
+      color: info.color,
+      bgColor: info.bgColor,
+    };
   };
 
   if (loading) {
@@ -360,7 +362,7 @@ export default function B2BProductsPage() {
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
           </div>
         </div>
-        <p className="mt-4 text-gray-500 animate-pulse">Urunler yukleniyor...</p>
+        <p className="mt-4 text-gray-500 animate-pulse">Nalaganje izdelkov...</p>
       </div>
     );
   }
@@ -370,15 +372,15 @@ export default function B2BProductsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Urunler</h1>
-          <p className="text-gray-500 mt-1">{filteredProducts.length} urun listeleniyor</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Izdelki</h1>
+          <p className="text-gray-500 mt-1">{filteredProducts.length} izdelkov</p>
         </div>
 
         {/* Cart Button */}
         <Link href="/b2b/cart">
           <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg shadow-green-500/25">
             <ShoppingCart className="w-4 h-4 mr-2" />
-            <span className="font-semibold">Sepet ({cartCount})</span>
+            <span className="font-semibold">Košarica ({cartCount})</span>
             <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-sm">
               {cartTotal.toFixed(2)} EUR
             </span>
@@ -392,7 +394,7 @@ export default function B2BProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
-            placeholder="Urun, kod veya barkod ara..."
+            placeholder="Išči izdelek, kodo ali črtno kodo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-12 h-12 text-base border-gray-200 focus:border-blue-500 focus:ring-blue-500"
@@ -415,7 +417,7 @@ export default function B2BProductsPage() {
             className={`h-12 ${showFilters ? 'bg-blue-50 border-blue-200' : ''}`}
           >
             <Filter className="w-4 h-4 mr-2" />
-            Filtrele
+            Filtriraj
             <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
           </Button>
 
@@ -446,19 +448,38 @@ export default function B2BProductsPage() {
             className="overflow-hidden"
           >
             <div className="p-4 bg-gray-50 rounded-2xl">
-              <p className="text-sm font-medium text-gray-700 mb-3">Kategoriler</p>
+              <p className="text-sm font-medium text-gray-700 mb-3">Kategorije</p>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(CATEGORIES).map(([id, cat]) => {
-                  const count = categoryCounts[id] || 0;
-                  if (id !== 'all' && count === 0) return null;
+                {/* Tüm ürünler */}
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all ${
+                    selectedCategory === 'all'
+                      ? 'bg-gray-100 text-gray-700 border-current'
+                      : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <Grid className="w-4 h-4" />
+                  <span className="font-medium">Vsi izdelki</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    selectedCategory === 'all' ? 'bg-white/50' : 'bg-gray-100'
+                  }`}>
+                    {categoryCounts.all || 0}
+                  </span>
+                </button>
 
-                  const isActive = selectedCategory === id;
+                {/* Ana kategoriler */}
+                {CATEGORIES.map((cat) => {
+                  const count = categoryCounts[cat.code] || 0;
+                  if (count === 0) return null;
+
+                  const isActive = selectedCategory === cat.code || selectedCategory.startsWith(cat.code + '.');
                   const Icon = cat.icon;
 
                   return (
                     <button
-                      key={id}
-                      onClick={() => setSelectedCategory(id)}
+                      key={cat.code}
+                      onClick={() => setSelectedCategory(cat.code)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all ${
                         isActive
                           ? `${cat.bgColor} ${cat.color} border-current`
@@ -466,7 +487,7 @@ export default function B2BProductsPage() {
                       }`}
                     >
                       <Icon className="w-4 h-4" />
-                      <span className="font-medium">{cat.name}</span>
+                      <span className="font-medium">{cat.nameSL}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                         isActive ? 'bg-white/50' : 'bg-gray-100'
                       }`}>
@@ -484,13 +505,13 @@ export default function B2BProductsPage() {
       {/* Active Filter Badge */}
       {selectedCategory !== 'all' && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Aktif filtre:</span>
+          <span className="text-sm text-gray-500">Aktivni filter:</span>
           <Badge
             variant="secondary"
             className="cursor-pointer hover:bg-gray-200"
             onClick={() => setSelectedCategory('all')}
           >
-            {getCategoryInfo(selectedCategory).name}
+            {getCatInfo(selectedCategory).name}
             <X className="w-3 h-3 ml-1" />
           </Badge>
         </div>
@@ -507,8 +528,8 @@ export default function B2BProductsPage() {
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Package className="w-10 h-10 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">Urun Bulunamadi</h3>
-            <p className="text-gray-500">Farkli bir arama veya filtre deneyin</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">Izdelek ni najden</h3>
+            <p className="text-gray-500">Poskusite z drugim iskanjem ali filtrom</p>
           </motion.div>
         ) : viewMode === 'grid' ? (
           <motion.div
@@ -518,7 +539,7 @@ export default function B2BProductsPage() {
           >
             {filteredProducts.map((product, index) => {
               const stockBadge = getStockBadge(product);
-              const catInfo = getCategoryInfo(product.category || 'OTHER_ITEMS');
+              const catInfo = getCatInfo(product.category || 'OTHER');
               const CatIcon = catInfo.icon;
               const isAdded = addedToCart === product.id;
 
@@ -643,12 +664,12 @@ export default function B2BProductsPage() {
                           {isAdded ? (
                             <>
                               <Check className="w-4 h-4 mr-1" />
-                              Eklendi
+                              Dodano
                             </>
                           ) : (
                             <>
                               <ShoppingCart className="w-4 h-4 mr-1" />
-                              Ekle
+                              Dodaj
                             </>
                           )}
                         </Button>
@@ -668,7 +689,7 @@ export default function B2BProductsPage() {
           >
             {filteredProducts.map((product, index) => {
               const stockBadge = getStockBadge(product);
-              const catInfo = getCategoryInfo(product.category || 'OTHER_ITEMS');
+              const catInfo = getCatInfo(product.category || 'OTHER');
               const CatIcon = catInfo.icon;
               const isAdded = addedToCart === product.id;
 

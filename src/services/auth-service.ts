@@ -26,8 +26,8 @@ const SYSTEM_USERS: ERPUser[] = [
   { id: 'u5', username: 'mustafa.senturk', password: 'Atlas2025!', fullName: 'Mustafa Senturk', role: 'depo_muduru', branchId: 'merkez', branchName: 'Merkez Depo', status: 'active' },
   { id: 'u6', username: 'halit.isik', password: 'Atlas2025!', fullName: 'Halit Isik', role: 'depo_muduru', branchId: 'merkez', branchName: 'Merkez Depo', status: 'active' },
 
-  // FINANS
-  { id: 'u7', username: 'senaide.ruslanov', password: 'Atlas2025!', fullName: 'Senaide Ruslanov', role: 'finans', branchId: 'merkez', branchName: 'Merkez Depo', status: 'active' },
+  // FINANS - SINIRLI ERISIM
+  { id: 'u7', username: 'senaide.ismailovski', password: 'Atlas2025!', fullName: 'Senaide Ismailovski', role: 'senaide', branchId: 'merkez', branchName: 'Merkez Depo', status: 'active' },
 
   // SOFOR
   { id: 'u8', username: 'mert.demir', password: 'Atlas2025!', fullName: 'Mert Demir', role: 'sofor', branchId: 'mesnica', branchName: 'Mesnica Kasap', status: 'active' },

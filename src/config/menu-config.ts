@@ -75,6 +75,10 @@ export const roleScreenAccess: Record<string, string[]> = {
   kasap: [
     'dashboard', 'butcher', 'logistics', 'products',
     'invoice_management', 'warehouse_management'
+  ],
+  // Senaide - Sinirli erisim: Sadece alis faturasi, masraf, ayarlar, urunler
+  senaide: [
+    'dashboard', 'products', 'purchase_invoices', 'expense_management', 'settings'
   ]
 };
 

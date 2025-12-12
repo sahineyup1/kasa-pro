@@ -34,74 +34,12 @@ import {
   Package, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   TrendingUp, AlertTriangle, DollarSign, BarChart3, Download
 } from 'lucide-react';
-
-// Category structure (matching Python ERP)
-const CATEGORY_STRUCTURE: Record<string, { name: string; icon: string; subcategories: Record<string, string> }> = {
-  'MEAT': {
-    name: 'Et Urunleri',
-    icon: '🥩',
-    subcategories: {
-      'BEEF': 'Dana',
-      'LAMB': 'Kuzu',
-      'CHICKEN': 'Tavuk',
-      'OTHER': 'Diger',
-    },
-  },
-  'DAIRY': {
-    name: 'Sut Urunleri',
-    icon: '🧀',
-    subcategories: {
-      'MILK': 'Sut',
-      'CHEESE': 'Peynir',
-      'YOGURT': 'Yogurt',
-    },
-  },
-  'GROCERY': {
-    name: 'Bakkaliye',
-    icon: '🛒',
-    subcategories: {
-      'DRY_GOODS': 'Kuru Gida',
-      'CANNED': 'Konserve',
-      'SPICES': 'Baharat',
-    },
-  },
-  'BEVERAGES': {
-    name: 'Icecekler',
-    icon: '🥤',
-    subcategories: {
-      'WATER': 'Su',
-      'JUICE': 'Meyve Suyu',
-      'SOFT_DRINKS': 'Gazli Icecek',
-    },
-  },
-  'PRODUCE': {
-    name: 'Meyve & Sebze',
-    icon: '🥬',
-    subcategories: {
-      'FRUITS': 'Meyveler',
-      'VEGETABLES': 'Sebzeler',
-    },
-  },
-  'BAKERY': {
-    name: 'Firindan',
-    icon: '🥖',
-    subcategories: {
-      'BREAD': 'Ekmek',
-      'PASTRY': 'Pasta',
-    },
-  },
-};
-
-// Get category display name
-function getCategoryDisplayName(code: string): string {
-  if (!code) return '-';
-  const parts = code.split('.');
-  const mainCat = CATEGORY_STRUCTURE[parts[0]];
-  if (!mainCat) return code;
-  if (parts.length === 1) return `${mainCat.icon} ${mainCat.name}`;
-  const subCat = mainCat.subcategories[parts[1]];
-  return subCat ? `${mainCat.icon} ${subCat}` : code;
-}
+import {
+  CATEGORIES,
+  getCategoryInfo,
+  getCategoryDisplayName as getCatDisplayName,
+  matchesCategory,
+} from '@/services/categories';
 
 // Status badge component
 function StatusBadge({ isActive }: { isActive: boolean }) {
@@ -237,13 +175,11 @@ export default function ProductsPage() {
         barcode.toLowerCase().includes(searchLower) ||
         sku.toLowerCase().includes(searchLower);
 
-      // Category filter
+      // Category filter - merkezi kategori servisi ile
       const category = getField(product, ['basic', 'category'], 'category', '');
-      const matchesCategory = categoryFilter === 'all' ||
-        category.startsWith(categoryFilter) ||
-        category === categoryFilter;
+      const categoryMatches = matchesCategory(category, categoryFilter);
 
-      return matchesSearch && matchesCategory;
+      return matchesSearch && categoryMatches;
     });
   }, [products, searchQuery, categoryFilter]);
 
@@ -275,17 +211,28 @@ export default function ProductsPage() {
     return { total, active, lowStock, totalValue };
   }, [products]);
 
-  // Build category options
+  // Build category options - hiyerarsik (ana + alt kategoriler)
   const categoryOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = [
+    const options: { value: string; label: string; isHeader?: boolean }[] = [
       { value: 'all', label: 'Tum Kategoriler' },
     ];
-    Object.entries(CATEGORY_STRUCTURE).forEach(([code, data]) => {
-      options.push({ value: code, label: `${data.icon} ${data.name}` });
-      Object.entries(data.subcategories).forEach(([subCode, subName]) => {
-        options.push({ value: `${code}.${subCode}`, label: `   ├─ ${subName}` });
+
+    CATEGORIES.forEach(cat => {
+      // Ana kategori (header)
+      options.push({
+        value: cat.code,
+        label: `${cat.nameTR}`,
+        isHeader: true,
+      });
+      // Alt kategoriler
+      cat.subcategories.forEach(sub => {
+        options.push({
+          value: sub.fullCode,
+          label: `  ${sub.nameTR}`,
+        });
       });
     });
+
     return options;
   }, []);
 
@@ -462,14 +409,20 @@ export default function ProductsPage() {
           </div>
 
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[220px]">
+            <SelectTrigger className="w-full sm:w-[240px]">
               <SelectValue placeholder="Kategori" />
             </SelectTrigger>
-            <SelectContent>
-              {categoryOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
+            <SelectContent className="max-h-[400px]">
+              {categoryOptions.map((opt: { value: string; label: string; isHeader?: boolean }) => (
+                opt.isHeader ? (
+                  <SelectItem key={opt.value} value={opt.value} className="font-semibold bg-gray-50">
+                    {opt.label}
+                  </SelectItem>
+                ) : (
+                  <SelectItem key={opt.value} value={opt.value} className="pl-6">
+                    {opt.label}
+                  </SelectItem>
+                )
               ))}
             </SelectContent>
           </Select>
@@ -524,7 +477,7 @@ export default function ProductsPage() {
                       <TableCell className="font-mono text-sm">{barcode}</TableCell>
                       <TableCell className="font-medium">{name}</TableCell>
                       <TableCell className="text-gray-600 text-sm">
-                        {getCategoryDisplayName(category)}
+                        {getCatDisplayName(category, 'tr')}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         €{price.toFixed(2)}

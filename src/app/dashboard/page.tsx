@@ -13,10 +13,14 @@ import {
   Package,
   DollarSign,
   Clock,
+  ShoppingCart,
+  Settings,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { subscribeToData, subscribeToFirestore, subscribeToRTDB } from '@/services/firebase';
+import { useAuthStore } from '@/stores/auth-store';
+import Link from 'next/link';
 import {
   AreaChart,
   Area,
@@ -84,6 +88,89 @@ interface RecentActivity {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuthStore();
+
+  // Senaide rolu icin ozel basit dashboard
+  if (user?.role === 'senaide') {
+    return (
+      <div className="space-y-4 sm:space-y-6 p-3 sm:p-6 bg-[#EAE8E3] min-h-screen">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-gray-900">Hos Geldiniz</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {user.fullName} - {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+            {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        {/* Hizli Erisim Kartlari */}
+        <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
+          <Link href="/dashboard/purchase-invoices">
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-105">
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <div className="p-4 rounded-full bg-blue-100 mb-4">
+                  <ShoppingCart className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Alis Faturasi</h3>
+                <p className="text-sm text-gray-500 mt-1">Yeni fatura girisi</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/dashboard/expenses">
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-105">
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <div className="p-4 rounded-full bg-orange-100 mb-4">
+                  <Receipt className="h-8 w-8 text-orange-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Masraflar</h3>
+                <p className="text-sm text-gray-500 mt-1">Masraf girisi</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/dashboard/products">
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-105">
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <div className="p-4 rounded-full bg-emerald-100 mb-4">
+                  <Package className="h-8 w-8 text-emerald-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Urunler</h3>
+                <p className="text-sm text-gray-500 mt-1">Urun listesi</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/dashboard/settings">
+            <Card className="bg-white shadow-lg hover:shadow-xl transition-all cursor-pointer hover:scale-105">
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <div className="p-4 rounded-full bg-gray-100 mb-4">
+                  <Settings className="h-8 w-8 text-gray-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Ayarlar</h3>
+                <p className="text-sm text-gray-500 mt-1">Kisisel ayarlar</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Bilgilendirme */}
+        <Card className="bg-white shadow-lg">
+          <CardContent className="p-6">
+            <div className="text-center text-gray-500">
+              <p className="text-sm">Yukaridaki menuleri kullanarak islemlerinizi yapabilirsiniz.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Ana veriler için loading state yok - hemen göster, veriler geldikçe güncellensin
   const [stats, setStats] = useState<DashboardStats>({
     expenseCount: 0,

@@ -29,7 +29,9 @@
       "Bash(timeout /t 5 /nobreak)",
       "WebFetch(domain:desetkasi-default-rtdb.europe-west1.firebasedatabase.app)",
       "Bash(node -e:*)",
-      "Bash(del \"C:\\Users\\Sahin\\Desktop\\kasa-pro\\temp_partners.json\")"
+      "Bash(del \"C:\\Users\\Sahin\\Desktop\\kasa-pro\\temp_partners.json\")",
+      "Bash(grep:*)",
+      "Bash(wc:*)"
     ]
   }
 }
