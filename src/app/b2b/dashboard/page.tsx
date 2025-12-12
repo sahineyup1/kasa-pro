@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { getSession, B2BSession } from '@/services/b2b-auth';
-import { getData, subscribeToRTDB } from '@/services/firebase';
+import { getData, getCachedDataArray } from '@/services/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,33 +53,39 @@ export default function B2BDashboardPage() {
     }
   };
 
-  // Subscribe to orders
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
     if (!session?.partnerId) return;
 
-    const unsubscribe = subscribeToRTDB('orders', (data) => {
-      if (data) {
-        const myOrders = data
-          .filter((o: any) => o.customerId === session.partnerId)
-          .map((o: any) => ({
-            id: o.id || o._id,
-            orderNumber: o.orderNumber || o.id,
-            status: o.status || 'pending',
-            totalAmount: o.totalAmount || 0,
-            createdAt: o.createdAt,
-            items: o.items || [],
-          }));
+    const loadOrders = async () => {
+      try {
+        const data = await getCachedDataArray('orders');
+        if (data) {
+          const myOrders = data
+            .filter((o: any) => o.customerId === session.partnerId)
+            .map((o: any) => ({
+              id: o.id || o._id,
+              orderNumber: o.orderNumber || o.id,
+              status: o.status || 'pending',
+              totalAmount: o.totalAmount || 0,
+              createdAt: o.createdAt,
+              items: o.items || [],
+            }));
 
-        myOrders.sort((a: Order, b: Order) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+          myOrders.sort((a: Order, b: Order) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
 
-        setOrders(myOrders);
+          setOrders(myOrders);
+        }
+      } catch (error) {
+        console.error('B2B Dashboard load error:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    loadOrders();
   }, [session?.partnerId]);
 
   // Stats calculation
@@ -204,6 +210,7 @@ export default function B2BDashboardPage() {
 
   return (
     <div className="space-y-6">
+
       {/* Welcome Hero */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

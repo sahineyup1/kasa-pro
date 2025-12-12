@@ -5,9 +5,18 @@ import { useRouter, usePathname } from 'next/navigation';
 import { getSession, logout, B2BSession } from '@/services/b2b-auth';
 import {
   ShoppingCart, Package, FileText, CreditCard, LogOut, Menu, X,
-  Home, ChevronRight, Loader2, Sparkles
+  Home, ChevronRight, Loader2, Sparkles, User, Settings, Globe,
+  HelpCircle, Shield, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
@@ -217,29 +226,88 @@ export function B2BLayoutWrapper({ children }: B2BLayoutWrapperProps) {
                 </Button>
               </Link>
 
-              {/* User Info - Desktop */}
-              <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-gray-200">
-                <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-50 rounded-xl">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">
-                      {session.partnerName?.charAt(0)?.toUpperCase() || 'U'}
-                    </span>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-900 max-w-[120px] truncate">
-                      {session.partnerName}
-                    </p>
-                    <p className="text-xs text-gray-500">{session.username}</p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                >
-                  <LogOut className="w-4 h-4" />
-                </Button>
+              {/* User Dropdown - Desktop */}
+              <div className="hidden sm:flex items-center pl-2 border-l border-gray-200">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-3 px-3 py-1.5 h-auto hover:bg-gray-50 rounded-xl">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          {session.partnerName?.charAt(0)?.toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-900 max-w-[120px] truncate">
+                          {session.partnerName}
+                        </p>
+                        <p className="text-xs text-gray-500">{session.username}</p>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{session.partnerName}</p>
+                        <p className="text-xs leading-none text-muted-foreground">@{session.username}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+
+                    <Link href="/b2b/settings">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profil</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/b2b/settings#language">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Globe className="mr-2 h-4 w-4" />
+                        <span>Jezik / Dil</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/b2b/settings#preferences">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Nastavitve</span>
+                      </DropdownMenuItem>
+                    </Link>
+
+                    <DropdownMenuSeparator />
+
+                    <Link href="/b2b/legal/terms">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <FileText className="mr-2 h-4 w-4" />
+                        <span>Pogoji uporabe</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/b2b/legal/privacy">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Zasebnost</span>
+                      </DropdownMenuItem>
+                    </Link>
+
+                    <DropdownMenuSeparator />
+
+                    <Link href="/b2b/legal/help">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <HelpCircle className="mr-2 h-4 w-4" />
+                        <span>Pomoc</span>
+                      </DropdownMenuItem>
+                    </Link>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuItem
+                      className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Odjava</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* Mobile Menu Button */}

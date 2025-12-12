@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { subscribeToData, subscribeToFirestore, subscribeToRTDB } from '@/services/firebase';
+import { getCachedFirestoreCollection, getCachedDataArray } from '@/services/firebase';
 import { useAuthStore } from '@/stores/auth-store';
 import Link from 'next/link';
 import {
@@ -204,228 +204,188 @@ export default function DashboardPage() {
     employees: false,
   });
 
+  // Verileri bir kez yükle (ONE-TIME FETCH - Firebase maliyetini %80 düşürür)
   useEffect(() => {
-
-    // Get current month names for charts
-    const getMonthNames = () => {
-      const months = [];
-      const now = new Date();
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push(d.toLocaleDateString('tr-TR', { month: 'short' }));
-      }
-      return months;
-    };
-
-    const monthNames = getMonthNames();
-
-    // Initialize monthly data
-    const initMonthlyData = monthNames.map((name) => ({
-      name,
-      purchases: 0,
-      sales: 0,
-      expenses: 0,
-    }));
-
-    // Masrafları dinle (Firestore)
-    const unsubExpenses = subscribeToFirestore('expenses', (list) => {
-      if (list && list.length > 0) {
-        const total = list.reduce((sum: number, e: any) => sum + (e.totalAmount || e.grossAmount || e.amount || 0), 0);
-        setStats((prev) => ({ ...prev, expenseCount: list.length, expenseTotal: total }));
-
-        // Kategori dağılımı
-        const categoryMap: Record<string, number> = {};
-        list.forEach((e: any) => {
-          const cat = e.category || e.categoryName || 'Diger';
-          categoryMap[cat] = (categoryMap[cat] || 0) + (e.totalAmount || e.grossAmount || e.amount || 0);
-        });
-        const catData = Object.entries(categoryMap)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 5);
-        setExpenseCategories(catData);
-
-        // Son aktiviteler
-        const sorted = [...list].sort(
-          (a: any, b: any) => new Date(b.date || b.documentDate || b.createdAt).getTime() - new Date(a.date || a.documentDate || a.createdAt).getTime()
-        );
-        const activities = sorted.slice(0, 3).map((e: any) => ({
-          id: e.id,
-          type: 'expense',
-          title: e.vendor || e.vendorName || 'Masraf',
-          amount: e.totalAmount || e.grossAmount || e.amount || 0,
-          date: e.date || e.documentDate,
-          icon: 'receipt',
-        }));
-        setRecentActivities((prev) => [...activities, ...prev.filter((a) => a.type !== 'expense')].slice(0, 8));
-
-        // Aylık masraf
+    const loadDashboardData = async () => {
+      // Get current month names for charts
+      const getMonthNames = () => {
+        const months = [];
         const now = new Date();
-        list.forEach((e: any) => {
-          const expDate = new Date(e.date || e.documentDate || e.createdAt);
-          const monthDiff = (now.getFullYear() - expDate.getFullYear()) * 12 + now.getMonth() - expDate.getMonth();
-          if (monthDiff >= 0 && monthDiff < 6) {
-            initMonthlyData[5 - monthDiff].expenses += e.totalAmount || e.grossAmount || e.amount || 0;
-          }
-        });
-      }
-      setLoadedSections(prev => ({ ...prev, expenses: true }));
-    });
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          months.push(d.toLocaleDateString('tr-TR', { month: 'short' }));
+        }
+        return months;
+      };
 
-    // Araçları dinle
-    const unsubVehicles = subscribeToData('vehicles', (data) => {
-      if (data) {
-        const list = Object.entries(data).map(([id, v]: [string, any]) => ({ id, ...v }));
-        setStats((prev) => ({ ...prev, vehicleCount: list.length }));
+      const monthNames = getMonthNames();
+      const initMonthlyData = monthNames.map((name) => ({
+        name,
+        purchases: 0,
+        sales: 0,
+        expenses: 0,
+      }));
 
-        // Yaklaşan bitiş tarihleri
-        const warnings: { plate: string; type: string; date: string }[] = [];
+      try {
+        // Paralel olarak tüm verileri çek (5 dakika cache)
+        const [expenses, vehicles, fuel, maintenance, purchases, saleInvoices, employees, products] = await Promise.all([
+          getCachedFirestoreCollection('expenses'),
+          getCachedDataArray('vehicles'),
+          getCachedDataArray('vehicle_fuel'),
+          getCachedDataArray('vehicle_maintenance'),
+          getCachedFirestoreCollection('purchases'),
+          getCachedFirestoreCollection('sale_invoices'),
+          getCachedDataArray('employees'),
+          getCachedDataArray('products'),
+        ]);
+
         const now = new Date();
         const thirtyDays = 30 * 24 * 60 * 60 * 1000;
 
-        list.forEach((v: any) => {
-          if (v.insuranceExpiry) {
-            const expiry = new Date(v.insuranceExpiry);
-            if (expiry.getTime() - now.getTime() < thirtyDays && expiry.getTime() > now.getTime()) {
-              warnings.push({ plate: v.plate, type: 'Sigorta', date: v.insuranceExpiry });
+        // Masraflar
+        if (expenses.length > 0) {
+          const expenseTotal = expenses.reduce((sum: number, e: any) => sum + (e.totalAmount || e.grossAmount || e.amount || 0), 0);
+
+          // Kategori dağılımı
+          const categoryMap: Record<string, number> = {};
+          expenses.forEach((e: any) => {
+            const cat = e.category || e.categoryName || 'Diger';
+            categoryMap[cat] = (categoryMap[cat] || 0) + (e.totalAmount || e.grossAmount || e.amount || 0);
+          });
+          const catData = Object.entries(categoryMap)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+          setExpenseCategories(catData);
+
+          // Son aktiviteler
+          const sorted = [...expenses].sort(
+            (a: any, b: any) => new Date(b.date || b.documentDate || b.createdAt).getTime() - new Date(a.date || a.documentDate || a.createdAt).getTime()
+          );
+          const activities = sorted.slice(0, 5).map((e: any) => ({
+            id: e.id,
+            type: 'expense',
+            title: e.vendor || e.vendorName || 'Masraf',
+            amount: e.totalAmount || e.grossAmount || e.amount || 0,
+            date: e.date || e.documentDate,
+            icon: 'receipt',
+          }));
+          setRecentActivities(activities);
+
+          // Aylık masraf
+          expenses.forEach((e: any) => {
+            const expDate = new Date(e.date || e.documentDate || e.createdAt);
+            const monthDiff = (now.getFullYear() - expDate.getFullYear()) * 12 + now.getMonth() - expDate.getMonth();
+            if (monthDiff >= 0 && monthDiff < 6) {
+              initMonthlyData[5 - monthDiff].expenses += e.totalAmount || e.grossAmount || e.amount || 0;
             }
-          }
-          if (v.kaskoExpiry) {
-            const expiry = new Date(v.kaskoExpiry);
-            if (expiry.getTime() - now.getTime() < thirtyDays && expiry.getTime() > now.getTime()) {
-              warnings.push({ plate: v.plate, type: 'Kasko', date: v.kaskoExpiry });
+          });
+
+          setStats(prev => ({ ...prev, expenseCount: expenses.length, expenseTotal }));
+        }
+        setLoadedSections(prev => ({ ...prev, expenses: true }));
+
+        // Araçlar
+        if (vehicles.length > 0) {
+          const warnings: { plate: string; type: string; date: string }[] = [];
+          vehicles.forEach((v: any) => {
+            if (v.insuranceExpiry) {
+              const expiry = new Date(v.insuranceExpiry);
+              if (expiry.getTime() - now.getTime() < thirtyDays && expiry.getTime() > now.getTime()) {
+                warnings.push({ plate: v.plate, type: 'Sigorta', date: v.insuranceExpiry });
+              }
             }
-          }
-        });
-        setExpiryWarnings(warnings);
-      }
-    });
+            if (v.kaskoExpiry) {
+              const expiry = new Date(v.kaskoExpiry);
+              if (expiry.getTime() - now.getTime() < thirtyDays && expiry.getTime() > now.getTime()) {
+                warnings.push({ plate: v.plate, type: 'Kasko', date: v.kaskoExpiry });
+              }
+            }
+          });
+          setExpiryWarnings(warnings);
+          setStats(prev => ({ ...prev, vehicleCount: vehicles.length }));
+        }
 
-    // Yakıt
-    const unsubFuel = subscribeToData('vehicle_fuel', (data) => {
-      if (data) {
-        const list = Object.values(data) as any[];
-        const total = list.reduce((sum, f) => sum + (f.totalAmount || 0), 0);
-        setStats((prev) => ({ ...prev, fuelTotal: total }));
-      }
-    });
+        // Yakıt
+        const fuelTotal = fuel.reduce((sum, f: any) => sum + (f.totalAmount || 0), 0);
+        setStats(prev => ({ ...prev, fuelTotal }));
 
-    // Bakım
-    const unsubMaintenance = subscribeToData('vehicle_maintenance', (data) => {
-      if (data) {
-        const list = Object.values(data) as any[];
-        const total = list.reduce((sum, m) => sum + (m.cost || 0), 0);
-        setStats((prev) => ({ ...prev, maintenanceTotal: total }));
-      }
-    });
+        // Bakım
+        const maintenanceTotal = maintenance.reduce((sum, m: any) => sum + (m.cost || 0), 0);
+        setStats(prev => ({ ...prev, maintenanceTotal }));
 
-    // Alış faturaları (Firestore - 'purchases' collection)
-    const unsubPurchase = subscribeToFirestore('purchases', (list) => {
-      if (list && list.length > 0) {
-        const activeList = list.filter((i: any) => i.status !== 'cancelled');
-        const total = activeList.reduce((sum: number, i: any) => sum + (i.total || i.grand_total || i.grandTotal || i.totalAmount || 0), 0);
-        const unpaid = activeList.filter((i: any) => i.paymentStatus === 'unpaid' || i.paymentStatus === 'odenmedi').length;
-        setStats((prev) => ({
-          ...prev,
-          purchaseInvoiceCount: activeList.length,
-          purchaseInvoiceTotal: total,
-          unpaidInvoices: unpaid,
-        }));
+        // Alış faturaları
+        if (purchases.length > 0) {
+          const activeList = purchases.filter((i: any) => i.status !== 'cancelled');
+          const purchaseTotal = activeList.reduce((sum: number, i: any) => sum + (i.total || i.grand_total || i.grandTotal || i.totalAmount || 0), 0);
+          const unpaid = activeList.filter((i: any) => i.paymentStatus === 'unpaid' || i.paymentStatus === 'odenmedi').length;
 
-        // Aylık alış
-        const now = new Date();
-        activeList.forEach((inv: any) => {
-          const invDate = new Date(inv.date || inv.invoiceDate || inv.createdAt);
-          const monthDiff = (now.getFullYear() - invDate.getFullYear()) * 12 + now.getMonth() - invDate.getMonth();
-          if (monthDiff >= 0 && monthDiff < 6) {
-            initMonthlyData[5 - monthDiff].purchases += inv.total || inv.grand_total || inv.grandTotal || inv.totalAmount || 0;
-          }
-        });
-      }
-      setLoadedSections(prev => ({ ...prev, purchases: true }));
-    });
+          activeList.forEach((inv: any) => {
+            const invDate = new Date(inv.date || inv.invoiceDate || inv.createdAt);
+            const monthDiff = (now.getFullYear() - invDate.getFullYear()) * 12 + now.getMonth() - invDate.getMonth();
+            if (monthDiff >= 0 && monthDiff < 6) {
+              initMonthlyData[5 - monthDiff].purchases += inv.total || inv.grand_total || inv.grandTotal || inv.totalAmount || 0;
+            }
+          });
 
-    // Satış faturaları (Firestore)
-    const unsubSale = subscribeToFirestore('sale_invoices', (list) => {
-      if (list && list.length > 0) {
-        const activeList = list.filter((i: any) => i.status !== 'cancelled');
-        const total = activeList.reduce((sum: number, i: any) => sum + (i.total || i.grand_total || i.grandTotal || i.totalAmount || 0), 0);
-        setStats((prev) => ({
-          ...prev,
-          saleInvoiceCount: activeList.length,
-          saleInvoiceTotal: total,
-        }));
+          setStats(prev => ({ ...prev, purchaseInvoiceCount: activeList.length, purchaseInvoiceTotal: purchaseTotal, unpaidInvoices: unpaid }));
+        }
+        setLoadedSections(prev => ({ ...prev, purchases: true }));
 
-        // Aylık satış
-        const now = new Date();
-        activeList.forEach((inv: any) => {
-          const invDate = new Date(inv.date || inv.invoiceDate || inv.createdAt);
-          const monthDiff = (now.getFullYear() - invDate.getFullYear()) * 12 + now.getMonth() - invDate.getMonth();
-          if (monthDiff >= 0 && monthDiff < 6) {
-            initMonthlyData[5 - monthDiff].sales += inv.total || inv.grand_total || inv.grandTotal || inv.totalAmount || 0;
-          }
-        });
+        // Satış faturaları
+        if (saleInvoices.length > 0) {
+          const activeList = saleInvoices.filter((i: any) => i.status !== 'cancelled');
+          const saleTotal = activeList.reduce((sum: number, i: any) => sum + (i.total || i.grand_total || i.grandTotal || i.totalAmount || 0), 0);
+
+          activeList.forEach((inv: any) => {
+            const invDate = new Date(inv.date || inv.invoiceDate || inv.createdAt);
+            const monthDiff = (now.getFullYear() - invDate.getFullYear()) * 12 + now.getMonth() - invDate.getMonth();
+            if (monthDiff >= 0 && monthDiff < 6) {
+              initMonthlyData[5 - monthDiff].sales += inv.total || inv.grand_total || inv.grandTotal || inv.totalAmount || 0;
+            }
+          });
+
+          setStats(prev => ({ ...prev, saleInvoiceCount: activeList.length, saleInvoiceTotal: saleTotal }));
+        }
+        setLoadedSections(prev => ({ ...prev, sales: true }));
         setMonthlyData([...initMonthlyData]);
-      }
-      setLoadedSections(prev => ({ ...prev, sales: true }));
-    });
 
-    // Personel
-    const unsubEmployees = subscribeToData('employees', (data) => {
-      if (data) {
-        const list = Object.entries(data).map(([id, e]: [string, any]) => ({ id, ...e }));
-        const activeList = list.filter((e: any) => e.status === 'active' || e.status === 'aktif');
-        const totalSalary = activeList.reduce((sum, e: any) => {
-          const salary = e.salary_info?.monthly_salary || e.salary || 0;
-          return sum + salary;
-        }, 0);
+        // Personel
+        if (employees.length > 0) {
+          const activeList = employees.filter((e: any) => e.status === 'active' || e.status === 'aktif');
+          const totalSalary = activeList.reduce((sum, e: any) => sum + (e.salary_info?.monthly_salary || e.salary || 0), 0);
 
-        setStats((prev) => ({
-          ...prev,
-          employeeCount: list.length,
-          activeEmployees: activeList.length,
-          totalSalary,
-        }));
-
-        // Vize uyarıları
-        const now = new Date();
-        const visaWarns: { name: string; date: string; daysLeft: number }[] = [];
-
-        list.forEach((e: any) => {
-          const visaDate = e.visa_info?.visa_expiry_date || e.visaExpiry;
-          if (visaDate && visaDate !== '9999-12-31') {
-            const expiry = new Date(visaDate);
-            const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            if (daysLeft > 0 && daysLeft <= 30) {
-              const name = e.personal_info?.full_name || `${e.firstName || ''} ${e.lastName || ''}`.trim();
-              visaWarns.push({ name, date: visaDate, daysLeft });
+          const visaWarns: { name: string; date: string; daysLeft: number }[] = [];
+          employees.forEach((e: any) => {
+            const visaDate = e.visa_info?.visa_expiry_date || e.visaExpiry;
+            if (visaDate && visaDate !== '9999-12-31') {
+              const expiry = new Date(visaDate);
+              const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              if (daysLeft > 0 && daysLeft <= 30) {
+                const name = e.personal_info?.full_name || `${e.firstName || ''} ${e.lastName || ''}`.trim();
+                visaWarns.push({ name, date: visaDate, daysLeft });
+              }
             }
-          }
-        });
-        setVisaWarnings(visaWarns.sort((a, b) => a.daysLeft - b.daysLeft));
-      }
-      setLoadedSections(prev => ({ ...prev, employees: true }));
-    });
+          });
+          setVisaWarnings(visaWarns.sort((a, b) => a.daysLeft - b.daysLeft));
+          setStats(prev => ({ ...prev, employeeCount: employees.length, activeEmployees: activeList.length, totalSalary }));
+        }
+        setLoadedSections(prev => ({ ...prev, employees: true }));
 
-    // Ürünler (RTDB)
-    const unsubProducts = subscribeToRTDB('products', (data) => {
-      if (data) {
-        const list = Object.values(data) as any[];
-        const lowStock = list.filter((p) => (p.stock || 0) < (p.minStock || 10)).length;
-        setStats((prev) => ({ ...prev, productCount: list.length, lowStockProducts: lowStock }));
-      }
-    });
+        // Ürünler
+        if (products.length > 0) {
+          const lowStock = products.filter((p: any) => (p.stock?.totalStock || p.stock_qty || 0) < (p.minStock || 10)).length;
+          setStats(prev => ({ ...prev, productCount: products.length, lowStockProducts: lowStock }));
+        }
 
-    return () => {
-      unsubExpenses();
-      unsubVehicles();
-      unsubFuel();
-      unsubMaintenance();
-      unsubPurchase();
-      unsubSale();
-      unsubEmployees();
-      unsubProducts();
+      } catch (error) {
+        console.error('Dashboard data load error:', error);
+        // Hata durumunda da loaded olarak işaretle
+        setLoadedSections({ expenses: true, sales: true, purchases: true, employees: true });
+      }
     };
+
+    loadDashboardData();
   }, []);
 
   // Calculate profit/loss

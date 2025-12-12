@@ -156,6 +156,145 @@ export const subscribeToRTDB = (
   return unsubscribe;
 };
 
+// =================== ONE-TIME FETCH (COST OPTIMIZED) ===================
+
+// RTDB'den tek seferlik array veri çek - SUBSCRIPTION YERINE BUNU KULLAN
+export const getDataArray = async (path: string): Promise<any[]> => {
+  const fullPath = erpPath(path);
+  try {
+    const snapshot = await get(ref(database, fullPath));
+    if (!snapshot.exists()) return [];
+
+    const rawData = snapshot.val();
+    let arrayData: any[] = [];
+
+    if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+      arrayData = Object.entries(rawData).map(([key, value]: [string, any]) => ({
+        id: key,
+        _id: key,
+        ...value
+      }));
+    } else if (Array.isArray(rawData)) {
+      arrayData = rawData.map((item, index) => ({
+        id: item?.id || index.toString(),
+        ...item
+      }));
+    }
+
+    return arrayData;
+  } catch (error) {
+    console.error(`getDataArray error for ${path}:`, error);
+    return [];
+  }
+};
+
+// Firestore'dan tek seferlik veri çek (array) - SUBSCRIPTION YERINE BUNU KULLAN
+export const getFirestoreCollection = async (
+  collectionName: string,
+  options?: {
+    limitCount?: number;
+    orderByField?: string;
+    orderDirection?: 'asc' | 'desc';
+  }
+): Promise<any[]> => {
+  try {
+    const col = getCollection(collectionName);
+    const constraints: any[] = [];
+
+    if (options?.orderByField) {
+      constraints.push(orderBy(options.orderByField, options.orderDirection || 'desc'));
+    }
+
+    if (options?.limitCount) {
+      constraints.push(limit(options.limitCount));
+    }
+
+    const q = constraints.length > 0 ? firestoreQuery(col, ...constraints) : col;
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      _id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error(`getFirestoreCollection error for ${collectionName}:`, error);
+    return [];
+  }
+};
+
+// =================== CACHE SYSTEM ===================
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const dataCache: Map<string, CacheEntry> = new Map();
+const DEFAULT_CACHE_DURATION = 5 * 60 * 1000; // 5 dakika
+
+// Cache'li RTDB veri çek
+export const getCachedDataArray = async (
+  path: string,
+  cacheDuration: number = DEFAULT_CACHE_DURATION
+): Promise<any[]> => {
+  const cacheKey = `rtdb:${path}`;
+  const cached = dataCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < cacheDuration) {
+    return cached.data;
+  }
+
+  const data = await getDataArray(path);
+  dataCache.set(cacheKey, { data, timestamp: Date.now() });
+  return data;
+};
+
+// Cache'li Firestore veri çek
+export const getCachedFirestoreCollection = async (
+  collectionName: string,
+  cacheDuration: number = DEFAULT_CACHE_DURATION,
+  options?: {
+    limitCount?: number;
+    orderByField?: string;
+    orderDirection?: 'asc' | 'desc';
+  }
+): Promise<any[]> => {
+  const cacheKey = `firestore:${collectionName}:${JSON.stringify(options || {})}`;
+  const cached = dataCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < cacheDuration) {
+    return cached.data;
+  }
+
+  const data = await getFirestoreCollection(collectionName, options);
+  dataCache.set(cacheKey, { data, timestamp: Date.now() });
+  return data;
+};
+
+// Cache temizle
+export const clearCache = (prefix?: string) => {
+  if (prefix) {
+    for (const key of dataCache.keys()) {
+      if (key.startsWith(prefix)) {
+        dataCache.delete(key);
+      }
+    }
+  } else {
+    dataCache.clear();
+  }
+};
+
+// Belirli bir cache'i invalidate et
+export const invalidateCache = (path: string, type: 'rtdb' | 'firestore' = 'rtdb') => {
+  const cacheKey = `${type}:${path}`;
+  for (const key of dataCache.keys()) {
+    if (key.startsWith(cacheKey)) {
+      dataCache.delete(key);
+    }
+  }
+};
+
 // =================== FIRESTORE HELPERS ===================
 
 // Collection name'i normalize et (Desktop app ile uyumlu)
@@ -489,6 +628,203 @@ export const subscribeToProductLots = (
     console.error('subscribeToProductLots error:', error);
     callback([]);
   });
+};
+
+// =================== OPTIMIZED PRODUCTS SERVICE ===================
+
+// Ürün cache - tüm ürünler bir kez yüklenip cache'lenir
+let allProductsCache: { data: any[]; timestamp: number } | null = null;
+const PRODUCTS_CACHE_DURATION = 10 * 60 * 1000; // 10 dakika
+
+// Tüm ürünleri yükle (cache'li) - sadece bir kez Firebase'den çeker
+export const getAllProductsCached = async (): Promise<any[]> => {
+  // Cache kontrolü
+  if (allProductsCache && Date.now() - allProductsCache.timestamp < PRODUCTS_CACHE_DURATION) {
+    console.log('Products from cache:', allProductsCache.data.length);
+    return allProductsCache.data;
+  }
+
+  console.log('Loading all products from Firebase...');
+  try {
+    // Önce Firestore'dan dene
+    const col = getCollection('products');
+    const snapshot = await getDocs(col);
+
+    let products: any[] = [];
+
+    if (snapshot.docs.length > 0) {
+      products = snapshot.docs.map(doc => ({
+        id: doc.id,
+        _id: doc.id,
+        ...doc.data()
+      }));
+    } else {
+      // Firestore boşsa RTDB'den dene
+      const rtdbData = await getDataArray('products');
+      products = rtdbData;
+    }
+
+    // Cache'e kaydet
+    allProductsCache = { data: products, timestamp: Date.now() };
+    console.log('Products loaded and cached:', products.length);
+
+    return products;
+  } catch (error) {
+    console.error('getAllProductsCached error:', error);
+    return [];
+  }
+};
+
+// Cache'i temizle (ürün eklendiğinde/güncellendiğinde çağrılmalı)
+export const invalidateProductsCache = () => {
+  allProductsCache = null;
+  console.log('Products cache invalidated');
+};
+
+// Ürünleri filtrele ve sayfalı getir (cache'den)
+export const getProductsFiltered = async (options: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  category?: string;
+  sortBy?: 'name' | 'stock' | 'price';
+  sortDir?: 'asc' | 'desc';
+}): Promise<{
+  items: any[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}> => {
+  const {
+    page = 0,
+    pageSize = 50,
+    search = '',
+    category = 'all',
+    sortBy = 'name',
+    sortDir = 'asc'
+  } = options;
+
+  // Cache'den tüm ürünleri al
+  const allProducts = await getAllProductsCached();
+
+  // Filtreleme
+  let filtered = allProducts.filter((p: any) => {
+    // Aktif kontrolü
+    const isActive = p.audit?.isActive ?? p.isActive ?? true;
+    if (!isActive) return false;
+
+    // Arama filtresi
+    if (search && search.length >= 2) {
+      const searchLower = search.toLowerCase();
+      const name = (p.basic?.name || p.name || '').toLowerCase();
+      const barcode = (p.barcodes?.mainBarcode || p.barcode || '').toLowerCase();
+      const sku = (p.basic?.sku || p.sku || '').toLowerCase();
+
+      if (!name.includes(searchLower) &&
+          !barcode.includes(searchLower) &&
+          !sku.includes(searchLower)) {
+        return false;
+      }
+    }
+
+    // Kategori filtresi
+    if (category && category !== 'all') {
+      const productCategory = p.basic?.category || p.category || '';
+      if (!productCategory.startsWith(category)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Sıralama
+  filtered.sort((a: any, b: any) => {
+    let valA: any, valB: any;
+
+    switch (sortBy) {
+      case 'name':
+        valA = (a.basic?.name || a.name || '').toLowerCase();
+        valB = (b.basic?.name || b.name || '').toLowerCase();
+        break;
+      case 'stock':
+        valA = a.stock?.totalStock ?? a.stock_qty ?? 0;
+        valB = b.stock?.totalStock ?? b.stock_qty ?? 0;
+        break;
+      case 'price':
+        valA = a.pricing?.sellPrice ?? a.price ?? 0;
+        valB = b.pricing?.sellPrice ?? b.price ?? 0;
+        break;
+      default:
+        valA = (a.basic?.name || a.name || '').toLowerCase();
+        valB = (b.basic?.name || b.name || '').toLowerCase();
+    }
+
+    if (sortDir === 'asc') {
+      return valA < valB ? -1 : valA > valB ? 1 : 0;
+    } else {
+      return valA > valB ? -1 : valA < valB ? 1 : 0;
+    }
+  });
+
+  // Sayfalama
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const start = page * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages
+  };
+};
+
+// Ürün istatistikleri (cache'den hesapla)
+export const getProductStats = async (): Promise<{
+  total: number;
+  active: number;
+  lowStock: number;
+  totalValue: number;
+}> => {
+  const allProducts = await getAllProductsCached();
+
+  let total = 0;
+  let active = 0;
+  let lowStock = 0;
+  let totalValue = 0;
+
+  allProducts.forEach((p: any) => {
+    total++;
+
+    const isActive = p.audit?.isActive ?? p.isActive ?? true;
+    if (isActive) active++;
+
+    const stock = p.stock?.totalStock ?? p.stock_qty ?? 0;
+    if (stock < 10 && stock >= 0) lowStock++;
+
+    const cost = p.pricing?.baseCost ?? p.cost ?? 0;
+    totalValue += stock * cost;
+  });
+
+  return { total, active, lowStock, totalValue };
+};
+
+// Barkod ile ürün bul (hızlı lookup)
+export const findProductByBarcode = async (barcode: string): Promise<any | null> => {
+  if (!barcode) return null;
+
+  const allProducts = await getAllProductsCached();
+  const found = allProducts.find((p: any) => {
+    const mainBarcode = p.barcodes?.mainBarcode || p.barcode || '';
+    const caseBarcode = p.barcodes?.caseBarcode?.barcode || '';
+    return mainBarcode === barcode || caseBarcode === barcode;
+  });
+
+  return found || null;
 };
 
 export {

@@ -48,7 +48,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { subscribeToFirestore, deleteFirestoreData, subscribeToBranches } from '@/services/firebase';
+import { getCachedFirestoreCollection, deleteFirestoreData, getCachedDataArray } from '@/services/firebase';
 import { PurchaseInvoiceDialog } from '@/components/dialogs/purchase-invoice-dialog';
 import { XMLInvoiceImportDialog } from '@/components/dialogs/xml-invoice-import-dialog';
 import { ExcelInvoiceImportDialog } from '@/components/dialogs/excel-invoice-import-dialog';
@@ -118,31 +118,33 @@ export default function PurchaseInvoicesPage() {
   const [xmlImportOpen, setXmlImportOpen] = useState(false);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
 
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
-    // Firebase Firestore'dan alış faturalarını dinle
-    const unsubInvoices = subscribeToFirestore('purchases', (data) => {
-      if (data) {
-        // Sort by date descending
-        const sorted = [...data].sort((a, b) => {
-          const dateA = new Date(a.date || a.invoice_date || a.createdAt || a.created_at || '').getTime();
-          const dateB = new Date(b.date || b.invoice_date || b.createdAt || b.created_at || '').getTime();
-          return dateB - dateA;
-        });
-        setInvoices(sorted);
-      } else {
-        setInvoices([]);
+    const loadData = async () => {
+      try {
+        const [invoiceData, branchData] = await Promise.all([
+          getCachedFirestoreCollection('purchases'),
+          getCachedDataArray('company/branches'),
+        ]);
+
+        if (invoiceData) {
+          const sorted = [...invoiceData].sort((a, b) => {
+            const dateA = new Date(a.date || a.invoice_date || a.createdAt || a.created_at || '').getTime();
+            const dateB = new Date(b.date || b.invoice_date || b.createdAt || b.created_at || '').getTime();
+            return dateB - dateA;
+          });
+          setInvoices(sorted);
+        }
+
+        setBranches(branchData || []);
+      } catch (error) {
+        console.error('Load error:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-
-    const unsubBranches = subscribeToBranches((data) => {
-      setBranches(data || []);
-    });
-
-    return () => {
-      unsubInvoices();
-      unsubBranches();
     };
+
+    loadData();
   }, []);
 
   const filteredInvoices = useMemo(() => {

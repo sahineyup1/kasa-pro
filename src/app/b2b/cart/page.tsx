@@ -290,30 +290,29 @@ export default function B2BCartPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Sepetim</h1>
+          <p className="text-gray-500">{cart.length} urun</p>
+        </div>
+        <div className="flex items-center gap-3">
           <Link href="/b2b/products">
-            <Button variant="outline" size="sm" className="rounded-xl">
+            <Button variant="outline" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Urunlere Don
+              Urunler
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Sepetim</h1>
-            <p className="text-gray-500">{cart.length} urun</p>
-          </div>
+          {cart.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearCart}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Temizle
+            </Button>
+          )}
         </div>
-
-        {cart.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={clearCart}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Sepeti Temizle
-          </Button>
-        )}
       </div>
 
       {/* Empty State */}

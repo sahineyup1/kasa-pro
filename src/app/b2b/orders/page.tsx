@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getSession, B2BSession } from '@/services/b2b-auth';
-import { subscribeToRTDB } from '@/services/firebase';
+import { getCachedDataArray } from '@/services/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import Link from 'next/link';
 
 interface OrderItem {
   productId: string;
@@ -118,40 +119,47 @@ export default function B2BOrdersPage() {
     setSession(currentSession);
   }, []);
 
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
     if (!session?.partnerId) return;
 
-    const unsubscribe = subscribeToRTDB('orders', (data) => {
-      if (data) {
-        const myOrders = data
-          .filter((o: any) => o.customerId === session.partnerId)
-          .map((o: any) => ({
-            id: o.id || o._id,
-            orderNumber: o.orderNumber || o.invoiceNumber || o.id,
-            invoiceNumber: o.invoiceNumber,
-            status: o.status || 'pending',
-            totalAmount: o.totalAmount || 0,
-            subtotal: o.subtotal || 0,
-            vatAmount: o.vatAmount || 0,
-            items: o.items || [],
-            createdAt: o.createdAt,
-            updatedAt: o.updatedAt,
-            notes: o.notes,
-            paymentMethod: o.paymentMethod,
-            deliveryPdf: o.deliveryPdf,
-          }));
+    const loadOrders = async () => {
+      try {
+        const data = await getCachedDataArray('orders');
+        if (data) {
+          const myOrders = data
+            .filter((o: any) => o.customerId === session.partnerId)
+            .map((o: any) => ({
+              id: o.id || o._id,
+              orderNumber: o.orderNumber || o.invoiceNumber || o.id,
+              invoiceNumber: o.invoiceNumber,
+              status: o.status || 'pending',
+              totalAmount: o.totalAmount || 0,
+              subtotal: o.subtotal || 0,
+              vatAmount: o.vatAmount || 0,
+              items: o.items || [],
+              createdAt: o.createdAt,
+              updatedAt: o.updatedAt,
+              notes: o.notes,
+              paymentMethod: o.paymentMethod,
+              deliveryPdf: o.deliveryPdf,
+            }));
 
-        // Sort by date desc
-        myOrders.sort((a: Order, b: Order) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+          // Sort by date desc
+          myOrders.sort((a: Order, b: Order) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
 
-        setOrders(myOrders);
+          setOrders(myOrders);
+        }
+      } catch (error) {
+        console.error('B2B Orders load error:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    loadOrders();
   }, [session?.partnerId]);
 
   // Filtered orders
@@ -233,6 +241,7 @@ export default function B2BOrdersPage() {
 
   return (
     <div className="space-y-6">
+
       {/* Header with Glassmorphism */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-6 md:p-8">
         <div className="absolute inset-0 bg-grid opacity-10"></div>
@@ -245,14 +254,6 @@ export default function B2BOrdersPage() {
               <h1 className="text-2xl md:text-3xl font-bold text-white">Siparislerim</h1>
               <p className="text-blue-100 mt-1">Tum siparislerinizi buradan takip edebilirsiniz</p>
             </div>
-            <Button
-              onClick={() => window.location.reload()}
-              variant="secondary"
-              className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Yenile
-            </Button>
           </div>
 
           {/* Stats Cards */}

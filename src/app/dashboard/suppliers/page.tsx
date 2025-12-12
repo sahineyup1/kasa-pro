@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { subscribeToRTDB, updateData, removeData } from '@/services/firebase';
+import { getCachedDataArray, updateData, removeData } from '@/services/firebase';
 import { SupplierDialog } from '@/components/dialogs/supplier-dialog';
 import { BulkVIESValidationDialog } from '@/components/dialogs/bulk-vies-validation-dialog';
 import { Plus, RefreshCw, MoreHorizontal, Pencil, Trash2, Eye, Search, Building2, Globe, Phone, Mail, Shield, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -145,20 +145,27 @@ export default function SuppliersPage() {
   const [sortField, setSortField] = useState<string>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Load suppliers from RTDB (partners collection filtered by isSupplier)
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
-    setLoading(true);
-    const unsubscribe = subscribeToRTDB('partners', (data) => {
-      // Sadece tedarikçileri filtrele (type.isSupplier veya basic.partnerTypes.isSupplier)
-      const suppliers = (data || []).filter((p: any) => {
-        const isSupplier = p.type?.isSupplier || p.basic?.partnerTypes?.isSupplier;
-        const isDeleted = p.basic?.status === 'deleted';
-        return isSupplier && !isDeleted;
-      });
-      setSuppliers(suppliers);
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    const loadSuppliers = async () => {
+      setLoading(true);
+      try {
+        const data = await getCachedDataArray('partners');
+        // Sadece tedarikçileri filtrele (type.isSupplier veya basic.partnerTypes.isSupplier)
+        const suppliers = (data || []).filter((p: any) => {
+          const isSupplier = p.type?.isSupplier || p.basic?.partnerTypes?.isSupplier;
+          const isDeleted = p.basic?.status === 'deleted';
+          return isSupplier && !isDeleted;
+        });
+        setSuppliers(suppliers);
+      } catch (error) {
+        console.error('Suppliers load error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSuppliers();
   }, []);
 
   // Filter suppliers

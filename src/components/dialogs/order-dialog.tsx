@@ -41,11 +41,15 @@ interface OrderItem {
   quantity?: number;
   unit?: string;
   price?: number;
+  unitPrice?: number; // B2B portal field
+  totalPrice?: number; // B2B portal field
+  vatRate?: number; // B2B portal field
 }
 
 interface Order {
   id: string;
   orderNo?: string;
+  orderNumber?: string; // B2B portal field
   branchId?: string;
   source?: string;
   status?: string;
@@ -60,7 +64,11 @@ interface Order {
   completedAt?: string;
   items?: OrderItem[];
   total?: number;
+  totalAmount?: number; // B2B portal field
+  subtotal?: number; // B2B portal field
+  vatAmount?: number; // B2B portal field
   notes?: string;
+  paymentMethod?: string; // B2B portal field
 }
 
 interface Product {
@@ -122,7 +130,20 @@ interface ViewOrderDialogProps {
 export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogProps) {
   if (!order) return null;
 
-  const total = order.total || order.items?.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0) || 0;
+  // B2B siparişleri unitPrice, ERP siparişleri price kullanıyor
+  const getItemPrice = (item: OrderItem) => item.unitPrice ?? item.price ?? 0;
+  const getItemTotal = (item: OrderItem) => item.totalPrice ?? ((item.quantity || 0) * getItemPrice(item));
+
+  // Toplam hesapla - B2B totalAmount, ERP total kullanıyor
+  const subtotal = order.subtotal || order.total || order.items?.reduce((sum, item) => sum + getItemTotal(item), 0) || 0;
+  const vatAmount = order.vatAmount || 0;
+  const total = order.totalAmount || order.total || subtotal + vatAmount;
+
+  // Sipariş numarası - B2B orderNumber, ERP orderNo kullanıyor
+  const orderNumber = order.orderNumber || order.orderNo || '-';
+
+  // Kaynak belirleme - B2B portal için özel gösterim
+  const isB2BOrder = order.source === 'b2b_portal';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -139,7 +160,7 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-xs text-gray-500">Siparis No</Label>
-              <p className="font-mono font-medium">{order.orderNo || '-'}</p>
+              <p className="font-mono font-medium">{orderNumber}</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-gray-500">Durum</Label>
@@ -152,7 +173,9 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
             <div className="space-y-1">
               <Label className="text-xs text-gray-500">Kaynak</Label>
               <p className="flex items-center gap-1 text-sm">
-                {order.source === 'mobile' ? (
+                {isB2BOrder ? (
+                  <><Package className="h-4 w-4 text-blue-500" /> B2B Portal</>
+                ) : order.source === 'mobile' ? (
                   <><Smartphone className="h-4 w-4 text-amber-500" /> Mobil</>
                 ) : (
                   <><Monitor className="h-4 w-4 text-gray-500" /> Desktop</>
@@ -170,7 +193,7 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
               <Label className="text-xs text-gray-500">Olusturan</Label>
               <p className="flex items-center gap-1 text-sm">
                 <User className="h-4 w-4 text-gray-400" />
-                {order.createdBy || '-'}
+                {order.createdBy || (isB2BOrder ? 'B2B Musteri' : '-')}
               </p>
             </div>
             {order.approvedAt && (
@@ -183,6 +206,12 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">Fatura No</Label>
                 <p className="font-mono text-sm">{order.invoiceId}</p>
+              </div>
+            )}
+            {order.paymentMethod && (
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Odeme Yontemi</Label>
+                <p className="text-sm">{order.paymentMethod === 'vadeli' ? 'Vadeli' : order.paymentMethod === 'pesin' ? 'Pesin' : order.paymentMethod}</p>
               </div>
             )}
           </div>
@@ -204,17 +233,34 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                 <TableBody>
                   {order.items && order.items.length > 0 ? (
                     <>
-                      {order.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{item.productName}</TableCell>
-                          <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell>{item.unit || 'Adet'}</TableCell>
-                          <TableCell className="text-right">€{(item.price || 0).toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-medium">
-                            €{((item.quantity || 0) * (item.price || 0)).toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {order.items.map((item, index) => {
+                        const itemPrice = getItemPrice(item);
+                        const itemTotal = getItemTotal(item);
+                        return (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell>{item.unit || 'Adet'}</TableCell>
+                            <TableCell className="text-right">€{itemPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              €{itemTotal.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* B2B siparişlerinde KDV ayrı göster */}
+                      {vatAmount > 0 && (
+                        <>
+                          <TableRow className="bg-gray-50">
+                            <TableCell colSpan={4} className="text-right text-sm">Ara Toplam:</TableCell>
+                            <TableCell className="text-right font-medium">€{subtotal.toFixed(2)}</TableCell>
+                          </TableRow>
+                          <TableRow className="bg-gray-50">
+                            <TableCell colSpan={4} className="text-right text-sm">KDV:</TableCell>
+                            <TableCell className="text-right font-medium">€{vatAmount.toFixed(2)}</TableCell>
+                          </TableRow>
+                        </>
+                      )}
                       <TableRow className="bg-gray-50">
                         <TableCell colSpan={4} className="text-right font-semibold">Toplam:</TableCell>
                         <TableCell className="text-right font-bold text-lg">€{total.toFixed(2)}</TableCell>

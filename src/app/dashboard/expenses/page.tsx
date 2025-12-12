@@ -62,12 +62,11 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
-  subscribeToFirestore,
+  getCachedFirestoreCollection,
   deleteFirestoreData,
   addFirestoreData,
   updateFirestoreData,
-  subscribeToRTDB,
-  subscribeToBranches,
+  getCachedDataArray,
   pushData,
   updateData
 } from '@/services/firebase';
@@ -200,69 +199,67 @@ export default function ExpensesPage() {
   const [vendorDialogOpen, setVendorDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<ExpenseVendor | null>(null);
 
-  // Load data
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
-    console.log('ExpensesPage: Subscribing to erp_expenses collection...');
+    const loadData = async () => {
+      try {
+        const [expenseData, vendorData, pendingData, branchData] = await Promise.all([
+          getCachedFirestoreCollection('expenses'),
+          getCachedDataArray('expense_vendors'),
+          getCachedFirestoreCollection('pending_expenses'),
+          getCachedDataArray('company/branches'),
+        ]);
 
-    // Masraf fisleri
-    const unsubExpenses = subscribeToFirestore('expenses', (data) => {
-      console.log('ExpensesPage: Received expenses data:', data?.length || 0, 'items');
-      if (data?.length > 0) {
-        console.log('ExpensesPage: First expense:', data[0]);
+        // Masraf fisleri
+        if (expenseData) {
+          const activeExpenses = expenseData
+            .filter((e: Expense) => e.isActive !== false)
+            .sort((a: Expense, b: Expense) => {
+              const dateA = a.documentDate || a.date || '';
+              const dateB = b.documentDate || b.date || '';
+              return dateB.localeCompare(dateA);
+            });
+          setExpenses(activeExpenses);
+        }
+
+        // Masraf carileri
+        if (vendorData) {
+          const vendorList = vendorData
+            .filter((v: any) => v.isActive !== false)
+            .map((v: any) => ({
+              id: v.id || v._id,
+              name: v.name || '',
+              category: v.category || 'other',
+              taxId: v.taxId || v.ddvNumber || '',
+              ddvNumber: v.ddvNumber || '',
+              address: v.address || '',
+              phone: v.phone || '',
+              email: v.email || '',
+              ocrKeywords: v.ocrKeywords || [],
+              isActive: v.isActive !== false,
+              totalExpenses: v.totalExpenses || 0,
+              lastExpenseDate: v.lastExpenseDate || '',
+            }))
+            .sort((a: ExpenseVendor, b: ExpenseVendor) => a.name.localeCompare(b.name));
+          setVendors(vendorList);
+        }
+
+        // OCR Bekleyenler
+        if (pendingData) {
+          const pending = pendingData.filter((p: PendingExpense) => p.status === 'pending');
+          setPendingExpenses(pending);
+        }
+
+        // Subeler
+        setBranches(branchData || []);
+      } catch (error) {
+        console.error('Expenses load error:', error);
+      } finally {
+        setLoading(false);
       }
-      const activeExpenses = data
-        .filter((e: Expense) => e.isActive !== false)
-        .sort((a: Expense, b: Expense) => {
-          const dateA = a.documentDate || a.date || '';
-          const dateB = b.documentDate || b.date || '';
-          return dateB.localeCompare(dateA);
-        });
-      console.log('ExpensesPage: Active expenses:', activeExpenses.length);
-      setExpenses(activeExpenses);
-      setLoading(false);
-    });
-
-    // Masraf carileri - RTDB'den
-    const unsubVendors = subscribeToRTDB('expense_vendors', (data) => {
-      if (data) {
-        const vendorList = data
-          .filter((v: any) => v.isActive !== false)
-          .map((v: any) => ({
-            id: v.id || v._id,
-            name: v.name || '',
-            category: v.category || 'other',
-            taxId: v.taxId || v.ddvNumber || '',
-            ddvNumber: v.ddvNumber || '',
-            address: v.address || '',
-            phone: v.phone || '',
-            email: v.email || '',
-            ocrKeywords: v.ocrKeywords || [],
-            isActive: v.isActive !== false,
-            totalExpenses: v.totalExpenses || 0,
-            lastExpenseDate: v.lastExpenseDate || '',
-          }))
-          .sort((a: ExpenseVendor, b: ExpenseVendor) => a.name.localeCompare(b.name));
-        setVendors(vendorList);
-      }
-    });
-
-    // OCR Bekleyenler
-    const unsubPending = subscribeToFirestore('pending_expenses', (data) => {
-      const pending = data.filter((p: PendingExpense) => p.status === 'pending');
-      setPendingExpenses(pending);
-    });
-
-    // Subeler
-    const unsubBranches = subscribeToBranches((data) => {
-      setBranches(data || []);
-    });
-
-    return () => {
-      unsubExpenses();
-      unsubVendors();
-      unsubPending();
-      unsubBranches();
     };
+
+    loadData();
   }, []);
 
   // ==================== OVERVIEW TAB ====================

@@ -65,12 +65,16 @@ interface StockRequest {
 interface Order {
   id: string;
   orderNo?: string;
+  orderNumber?: string; // B2B portal field
   orderDate?: string;
+  createdAt?: string; // B2B portal field
   customerName?: string;
   customerId?: string;
   items?: RequestItem[];
   total?: number;
+  totalAmount?: number; // B2B portal field
   status?: string;
+  source?: string; // 'b2b_portal' for B2B orders
 }
 
 interface MissingList {
@@ -284,8 +288,9 @@ export default function LogisticsPage() {
     });
 
     const unsubOrders = subscribeToRTDB('orders', (data) => {
+      // B2B siparişleri 'approved' durumunda geliyor
       const filtered = (data || []).filter((o: Order) =>
-        ['pending', 'confirmed', 'preparing'].includes(o.status || '')
+        ['pending', 'confirmed', 'preparing', 'approved'].includes(o.status || '')
       );
       setOrders(filtered);
     });
@@ -342,17 +347,25 @@ export default function LogisticsPage() {
       });
     });
 
-    // Orders
-    orders.forEach(o => {
+    // Orders (B2B portal uses orderNumber/totalAmount, ERP uses orderNo/total)
+    orders.forEach((o: any) => {
+      // B2B siparişleri totalAmount, ERP siparişleri total kullanıyor
+      // totalAmount öncelikli - 0 değerini de kontrol et
+      const orderTotal = (typeof o.totalAmount === 'number' && o.totalAmount > 0)
+        ? o.totalAmount
+        : (typeof o.total === 'number' && o.total > 0)
+          ? o.total
+          : 0;
+
       items.push({
         id: o.id,
         type: 'order',
-        number: o.orderNo || '-',
-        date: o.orderDate || o.id,
+        number: o.orderNo || o.orderNumber || '-',
+        date: o.orderDate || o.createdAt || o.id,
         source: o.customerName || '-',
         sourceId: o.customerId,
         itemCount: o.items?.length || 0,
-        totalAmount: o.total || 0,
+        totalAmount: orderTotal,
         status: o.status || 'pending',
         items: o.items || [],
         originalData: o,
@@ -640,7 +653,12 @@ export default function LogisticsPage() {
                         <TableCell className="font-medium">{item.source}</TableCell>
                         <TableCell className="text-right">{item.itemCount}</TableCell>
                         <TableCell className="text-right font-medium hidden sm:table-cell">
-                          {item.totalAmount > 0 ? `€${item.totalAmount.toFixed(2)}` : '-'}
+                          {(() => {
+                            // originalData'dan direkt kontrol et (B2B: totalAmount, ERP: total)
+                            const data = item.originalData as any;
+                            const amt = data?.totalAmount || data?.total || item.totalAmount || 0;
+                            return amt > 0 ? `€${amt.toFixed(2)}` : '-';
+                          })()}
                         </TableCell>
                         <TableCell><StatusBadge status={item.status} /></TableCell>
                         <TableCell>

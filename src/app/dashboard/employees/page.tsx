@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { subscribeToData, updateData, removeData } from '@/services/firebase';
+import { getDataArray, updateData, removeData } from '@/services/firebase';
 import { EmployeeDialog } from '@/components/dialogs/employee-dialog';
 import { LeaveDialog } from '@/components/dialogs/leave-dialog';
 import { BulkSalaryDialog } from '@/components/dialogs/bulk-salary-dialog';
@@ -187,73 +187,76 @@ export default function EmployeesPage() {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
 
-  // Load employees from RTDB (same as Python desktop app: erp/employees)
+  // ONE-TIME FETCH - Firebase maliyetini düşürür
   useEffect(() => {
-    setLoading(true);
-    const unsubscribe = subscribeToData('employees', (data) => {
-      if (data) {
-        // Convert RTDB object to array with IDs
-        const employeeList = Object.entries(data).map(([id, emp]: [string, any]) => {
-          // Python structure uses personal_info.full_name
-          const fullName = emp.personal_info?.full_name || '';
-          const nameParts = fullName.split(' ');
-          const firstName = emp.personal_info?.first_name || nameParts[0] || emp.firstName || '';
-          const lastName = emp.personal_info?.last_name || nameParts.slice(1).join(' ') || emp.lastName || '';
+    const loadEmployees = async () => {
+      setLoading(true);
+      try {
+        const data = await getDataArray('employees');
+        if (data && data.length > 0) {
+          // Convert data to employee list with proper structure
+          const employeeList = data.map((emp: any) => {
+            const fullName = emp.personal_info?.full_name || '';
+            const nameParts = fullName.split(' ');
+            const firstName = emp.personal_info?.first_name || nameParts[0] || emp.firstName || '';
+            const lastName = emp.personal_info?.last_name || nameParts.slice(1).join(' ') || emp.lastName || '';
 
-          return {
-            id,
-            ...emp,
-            // Map Python structure to web structure
-            firstName,
-            lastName,
-            fullName,
-            role: emp.employment_info?.role || emp.role || '',
-            branch: emp.employment_info?.branch || emp.branch || '',
-            branchId: emp.employment_info?.branch_id || emp.branchId || '',
-            position: emp.employment_info?.position || emp.position || '',
-            phone: emp.personal_info?.phone || emp.phone || '',
-            email: emp.personal_info?.email || emp.email || '',
-            salary: emp.salary_info?.monthly_salary || emp.salary || 0,
-            cashSalary: emp.salary_info?.cash_salary || 0,
-            sgkIncluded: emp.salary_info?.sgk_included || false,
-            status: emp.status || emp.employment_info?.status || 'active',
-            startDate: emp.employment_info?.start_date || emp.startDate || '',
-            visaExpiry: emp.visa_info?.visa_expiry_date || emp.documents?.visa_expiry_date || emp.visaExpiry || '',
-            residenceType: emp.visa_info?.residence_type || '',
-            documentExpiry: emp.visa_info?.document_expiry_date || emp.documents?.document_expiry_date || emp.documentExpiry || '',
-            notes: emp.notes || '',
-            // Keep nested structure for compatibility
-            personal: {
+            return {
+              id: emp.id,
+              ...emp,
               firstName,
               lastName,
               fullName,
-              phone: emp.personal_info?.phone || emp.phone || '',
-              email: emp.personal_info?.email || emp.email || '',
-            },
-            employment: {
               role: emp.employment_info?.role || emp.role || '',
               branch: emp.employment_info?.branch || emp.branch || '',
               branchId: emp.employment_info?.branch_id || emp.branchId || '',
               position: emp.employment_info?.position || emp.position || '',
+              phone: emp.personal_info?.phone || emp.phone || '',
+              email: emp.personal_info?.email || emp.email || '',
               salary: emp.salary_info?.monthly_salary || emp.salary || 0,
+              cashSalary: emp.salary_info?.cash_salary || 0,
+              sgkIncluded: emp.salary_info?.sgk_included || false,
               status: emp.status || emp.employment_info?.status || 'active',
               startDate: emp.employment_info?.start_date || emp.startDate || '',
-            },
-            documents: {
               visaExpiry: emp.visa_info?.visa_expiry_date || emp.documents?.visa_expiry_date || emp.visaExpiry || '',
+              residenceType: emp.visa_info?.residence_type || '',
               documentExpiry: emp.visa_info?.document_expiry_date || emp.documents?.document_expiry_date || emp.documentExpiry || '',
-            },
-          };
-        });
-        console.log('Employees loaded from RTDB:', employeeList.length);
-        setEmployees(employeeList);
-      } else {
-        console.log('No employees in RTDB');
+              notes: emp.notes || '',
+              personal: {
+                firstName,
+                lastName,
+                fullName,
+                phone: emp.personal_info?.phone || emp.phone || '',
+                email: emp.personal_info?.email || emp.email || '',
+              },
+              employment: {
+                role: emp.employment_info?.role || emp.role || '',
+                branch: emp.employment_info?.branch || emp.branch || '',
+                branchId: emp.employment_info?.branch_id || emp.branchId || '',
+                position: emp.employment_info?.position || emp.position || '',
+                salary: emp.salary_info?.monthly_salary || emp.salary || 0,
+                status: emp.status || emp.employment_info?.status || 'active',
+                startDate: emp.employment_info?.start_date || emp.startDate || '',
+              },
+              documents: {
+                visaExpiry: emp.visa_info?.visa_expiry_date || emp.documents?.visa_expiry_date || emp.visaExpiry || '',
+                documentExpiry: emp.visa_info?.document_expiry_date || emp.documents?.document_expiry_date || emp.documentExpiry || '',
+              },
+            };
+          });
+          setEmployees(employeeList);
+        } else {
+          setEmployees([]);
+        }
+      } catch (error) {
+        console.error('Employees load error:', error);
         setEmployees([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+
+    loadEmployees();
   }, []);
 
   // Filter employees

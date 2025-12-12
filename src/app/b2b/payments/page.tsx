@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { getSession, B2BSession } from '@/services/b2b-auth';
-import { subscribeToRTDB, getData, pushData } from '@/services/firebase';
+import { getCachedDataArray, getData, pushData } from '@/services/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 interface Payment {
   id: string;
@@ -117,35 +118,41 @@ export default function B2BPaymentsPage() {
     loadPartnerData();
   }, [session?.partnerId]);
 
-  // Load payments
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
     if (!session?.partnerId) return;
 
-    const unsubscribe = subscribeToRTDB('payments', (data) => {
-      if (data) {
-        const myPayments = data
-          .filter((p: any) => p.customerId === session.partnerId)
-          .map((p: any) => ({
-            id: p.id || p._id,
-            amount: p.amount || 0,
-            method: p.method || 'cash',
-            status: p.status || 'pending',
-            reference: p.reference,
-            notes: p.notes,
-            createdAt: p.createdAt,
-            orderId: p.orderId,
-          }));
+    const loadPayments = async () => {
+      try {
+        const data = await getCachedDataArray('payments');
+        if (data) {
+          const myPayments = data
+            .filter((p: any) => p.customerId === session.partnerId)
+            .map((p: any) => ({
+              id: p.id || p._id,
+              amount: p.amount || 0,
+              method: p.method || 'cash',
+              status: p.status || 'pending',
+              reference: p.reference,
+              notes: p.notes,
+              createdAt: p.createdAt,
+              orderId: p.orderId,
+            }));
 
-        myPayments.sort((a: Payment, b: Payment) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+          myPayments.sort((a: Payment, b: Payment) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
 
-        setPayments(myPayments);
+          setPayments(myPayments);
+        }
+      } catch (error) {
+        console.error('B2B Payments load error:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    loadPayments();
   }, [session?.partnerId]);
 
   // Balance calculation
@@ -259,6 +266,7 @@ export default function B2BPaymentsPage() {
 
   return (
     <div className="space-y-6">
+
       {/* Balance Hero Card */}
       <div className="relative overflow-hidden rounded-2xl">
         <div className={`p-6 md:p-8 ${balance >= 0 ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700' : 'bg-gradient-to-br from-red-500 via-red-600 to-rose-700'}`}>

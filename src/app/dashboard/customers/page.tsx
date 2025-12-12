@@ -44,7 +44,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
-import { subscribeToRTDB, removeData } from '@/services/firebase';
+import { getCachedDataArray, removeData } from '@/services/firebase';
 import { CustomerDialog } from '@/components/dialogs/customer-dialog';
 
 // Country flags
@@ -123,6 +123,22 @@ interface Customer {
     discount?: number;
     paymentTerms?: number;
   };
+  b2bLogin?: {
+    username?: string;
+    isActive?: boolean;
+    customerType?: string;
+    discount?: number;
+    allowedCategories?: string[];
+    categoryDiscounts?: Record<string, number>;
+    productPrices?: Record<string, { price?: number; discount?: number }>;
+    language?: string;
+    permissions?: {
+      canOrder?: boolean;
+      canViewPrices?: boolean;
+      canViewBalance?: boolean;
+      canViewHistory?: boolean;
+    };
+  };
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -147,26 +163,32 @@ export default function CustomersPage() {
   const [sortField, setSortField] = useState<string>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
-    // RTDB'den partners koleksiyonundan müşterileri dinle
-    const unsubscribe = subscribeToRTDB('partners', (data) => {
-      // Sadece müşterileri filtrele (type.isCustomer veya basic.partnerTypes.isCustomer)
-      const customers = data
-        .filter((p: any) => {
-          const isCustomer = p.type?.isCustomer || p.basic?.partnerTypes?.isCustomer;
-          const isActive = p.isActive !== false && p.basic?.status !== 'deleted';
-          return isCustomer && isActive;
-        })
-        .sort((a: Customer, b: Customer) => {
-          const nameA = a.basic?.name || a.name || a.companyName || '';
-          const nameB = b.basic?.name || b.name || b.companyName || '';
-          return nameA.localeCompare(nameB);
-        });
-      setCustomers(customers);
-      setLoading(false);
-    });
+    const loadCustomers = async () => {
+      try {
+        const data = await getCachedDataArray('partners');
+        // Sadece müşterileri filtrele (type.isCustomer veya basic.partnerTypes.isCustomer)
+        const customers = data
+          .filter((p: any) => {
+            const isCustomer = p.type?.isCustomer || p.basic?.partnerTypes?.isCustomer;
+            const isActive = p.isActive !== false && p.basic?.status !== 'deleted';
+            return isCustomer && isActive;
+          })
+          .sort((a: Customer, b: Customer) => {
+            const nameA = a.basic?.name || a.name || a.companyName || '';
+            const nameB = b.basic?.name || b.name || b.companyName || '';
+            return nameA.localeCompare(nameB);
+          });
+        setCustomers(customers);
+      } catch (error) {
+        console.error('Customers load error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    loadCustomers();
   }, []);
 
   // Helper: Get customer field (supports both flat and nested structure)

@@ -48,7 +48,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { subscribeToFirestore, deleteFirestoreData, subscribeToBranches } from '@/services/firebase';
+import { getCachedFirestoreCollection, deleteFirestoreData, getCachedDataArray } from '@/services/firebase';
 import { SaleInvoiceDialog } from '@/components/dialogs/sale-invoice-dialog';
 import { toast } from 'sonner';
 
@@ -124,31 +124,33 @@ export default function SaleInvoicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<SaleInvoice | null>(null);
 
-  // Load invoices from Firestore
+  // ONE-TIME FETCH - Firebase maliyetini düşürür (5 dakika cache)
   useEffect(() => {
-    const unsubInvoices = subscribeToFirestore('sale_invoices', (data) => {
-      if (data) {
-        // Sort by date descending
-        const sorted = [...data].sort((a, b) => {
-          const dateA = new Date(a.invoiceDate || a.date || a.createdAt || '').getTime();
-          const dateB = new Date(b.invoiceDate || b.date || b.createdAt || '').getTime();
-          return dateB - dateA;
-        });
-        setInvoices(sorted);
-      } else {
-        setInvoices([]);
+    const loadData = async () => {
+      try {
+        const [invoiceData, branchData] = await Promise.all([
+          getCachedFirestoreCollection('sale_invoices'),
+          getCachedDataArray('company/branches'),
+        ]);
+
+        if (invoiceData) {
+          const sorted = [...invoiceData].sort((a, b) => {
+            const dateA = new Date(a.invoiceDate || a.date || a.createdAt || '').getTime();
+            const dateB = new Date(b.invoiceDate || b.date || b.createdAt || '').getTime();
+            return dateB - dateA;
+          });
+          setInvoices(sorted);
+        }
+
+        setBranches(branchData || []);
+      } catch (error) {
+        console.error('Load error:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-
-    const unsubBranches = subscribeToBranches((data) => {
-      setBranches(data || []);
-    });
-
-    return () => {
-      unsubInvoices();
-      unsubBranches();
     };
+
+    loadData();
   }, []);
 
   // Filter invoices
