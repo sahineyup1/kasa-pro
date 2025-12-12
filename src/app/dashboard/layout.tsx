@@ -5,6 +5,9 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { AuthGuard } from '@/components/auth/auth-guard';
 import { cn } from '@/lib/utils';
+import { SplashScreen } from '@/components/splash/splash-screen';
+import { PWAInstallPrompt } from '@/components/pwa/pwa-install-prompt';
+import { ServiceWorkerRegistration } from '@/components/pwa/service-worker-registration';
 
 export default function DashboardLayout({
   children,
@@ -77,6 +80,7 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
+      <SplashScreen minDuration={2000} />
       <div className="min-h-screen bg-muted/30">
         {/* Mobile Overlay */}
         {mobileMenuOpen && (
@@ -114,6 +118,8 @@ export default function DashboardLayout({
           <main className="p-4 lg:p-6">{children}</main>
         </div>
       </div>
+      <PWAInstallPrompt />
+      <ServiceWorkerRegistration />
     </AuthGuard>
   );
 }

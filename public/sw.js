@@ -47,6 +47,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // B2B sayfaları için service worker bypass - doğrudan network
+  if (url.pathname.startsWith('/b2b')) {
+    return;
+  }
+
   // API istekleri icin network-only
   if (url.pathname.startsWith('/api') || url.hostname.includes('firebase')) {
     event.respondWith(

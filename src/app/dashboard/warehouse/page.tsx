@@ -32,6 +32,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { subscribeToRTDB, updateData, removeData } from '@/services/firebase';
+// TODO: Firestore sktLogs için - sayım/kasa entegrasyonu sonrası aktif edilecek
+// import { firestore } from '@/services/firebase';
+// import { collection, onSnapshot, getDocs } from 'firebase/firestore';
 import {
   Plus, RefreshCw, MoreHorizontal, Search, Download, Eye, Send, Trash2, Edit,
   Warehouse, Package, AlertTriangle, Clock, ShoppingCart, FileText, CheckCircle,
@@ -156,10 +159,16 @@ interface InventoryCount {
 interface LotTracking {
   id: string;
   barcode?: string;
+  mainBarcode?: string;
   productName?: string;
   lotId?: string;
+  lotNumber?: string;
   expiryDate?: string;
   quantity?: number;
+  createdAt?: string;
+  userId?: string;
+  source?: string;
+  invoiceNo?: string;
 }
 
 interface Order {
@@ -278,9 +287,10 @@ export default function WarehousePage() {
       setInventoryCounts(data || []);
     });
 
-    const unsubLots = subscribeToRTDB('lot_tracking', (data) => {
-      setLotTrackings(data || []);
-    });
+    // TODO: Firestore sktLogs - Sayım ve kasa entegrasyonu sonrası aktif edilecek
+    // Şimdilik pasif - Firebase maliyeti için
+    // const loadSktLogs = async () => { ... }
+    const unsubLots = () => {}; // Boş unsubscribe
 
     const unsubOrders = subscribeToRTDB('orders', (data) => {
       setOrders(data || []);
@@ -989,9 +999,9 @@ export default function WarehousePage() {
 
                         return (
                           <TableRow key={lot.id} className={daysLeft < 7 ? 'bg-red-50' : daysLeft < 15 ? 'bg-amber-50' : ''}>
-                            <TableCell className="font-mono text-sm">{lot.barcode || '-'}</TableCell>
+                            <TableCell className="font-mono text-sm">{lot.barcode || lot.mainBarcode || '-'}</TableCell>
                             <TableCell className="font-medium">{lot.productName || '-'}</TableCell>
-                            <TableCell className="font-mono text-sm">{lot.lotId || '-'}</TableCell>
+                            <TableCell className="font-mono text-sm">{lot.lotNumber || lot.lotId || '-'}</TableCell>
                             <TableCell>{lot.expiryDate || '-'}</TableCell>
                             <TableCell className="text-right font-medium">{lot.quantity || 0}</TableCell>
                             <TableCell className={`text-right font-medium ${daysLeft < 7 ? 'text-red-600' : daysLeft < 15 ? 'text-amber-600' : 'text-green-600'}`}>

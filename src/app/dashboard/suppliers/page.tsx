@@ -28,7 +28,7 @@ import {
 import { subscribeToRTDB, updateData, removeData } from '@/services/firebase';
 import { SupplierDialog } from '@/components/dialogs/supplier-dialog';
 import { BulkVIESValidationDialog } from '@/components/dialogs/bulk-vies-validation-dialog';
-import { Plus, RefreshCw, MoreHorizontal, Pencil, Trash2, Eye, Search, Building2, Globe, Phone, Mail, Shield } from 'lucide-react';
+import { Plus, RefreshCw, MoreHorizontal, Pencil, Trash2, Eye, Search, Building2, Globe, Phone, Mail, Shield, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 // Status badge component
 function StatusBadge({ isActive }: { isActive: boolean }) {
@@ -141,6 +141,10 @@ export default function SuppliersPage() {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [viesDialogOpen, setViesDialogOpen] = useState(false);
 
+  // Sorting state
+  const [sortField, setSortField] = useState<string>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   // Load suppliers from RTDB (partners collection filtered by isSupplier)
   useEffect(() => {
     setLoading(true);
@@ -189,8 +193,52 @@ export default function SuppliersPage() {
         categories.some(c => c.toLowerCase() === categoryFilter.toLowerCase());
 
       return matchesSearch && matchesStatus && matchesCountry && matchesCategory;
+    }).sort((a, b) => {
+      let valueA: any;
+      let valueB: any;
+
+      switch (sortField) {
+        case 'name':
+          valueA = getField(a, ['basic', 'name'], 'name', '');
+          valueB = getField(b, ['basic', 'name'], 'name', '');
+          break;
+        case 'country':
+          valueA = getField(a, ['basic', 'country'], 'country', '');
+          valueB = getField(b, ['basic', 'country'], 'country', '');
+          break;
+        case 'city':
+          valueA = getField(a, ['contact', 'address', 'city'], 'city', '');
+          valueB = getField(b, ['contact', 'address', 'city'], 'city', '');
+          break;
+        case 'balance':
+          valueA = getField(a, ['payment', 'currentBalance'], 'currentBalance', 0);
+          valueB = getField(b, ['payment', 'currentBalance'], 'currentBalance', 0);
+          break;
+        case 'taxId':
+          valueA = getField(a, ['tax', 'taxId'], 'taxId', '');
+          valueB = getField(b, ['tax', 'taxId'], 'taxId', '');
+          break;
+        default:
+          valueA = getField(a, ['basic', 'name'], 'name', '');
+          valueB = getField(b, ['basic', 'name'], 'name', '');
+      }
+
+      // Numeric comparison for balance
+      if (sortField === 'balance') {
+        return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
+      }
+
+      // Natural sort for taxId/code (handles numeric strings properly)
+      if (sortField === 'taxId') {
+        const comparison = String(valueA).localeCompare(String(valueB), 'tr', { numeric: true });
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+
+      // String comparison
+      const comparison = String(valueA).localeCompare(String(valueB), 'tr');
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [suppliers, searchQuery, statusFilter, countryFilter, categoryFilter]);
+  }, [suppliers, searchQuery, statusFilter, countryFilter, categoryFilter, sortField, sortDirection]);
 
   // Stats
   const stats = useMemo(() => {
@@ -411,6 +459,34 @@ export default function SuppliersPage() {
               ))}
             </SelectContent>
           </Select>
+
+          <div className="flex items-center gap-2 border-l pl-4">
+            <ArrowUpDown className="h-4 w-4 text-gray-400" />
+            <Select value={sortField} onValueChange={setSortField}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Sirala" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Isim</SelectItem>
+                <SelectItem value="country">Ulke</SelectItem>
+                <SelectItem value="city">Sehir</SelectItem>
+                <SelectItem value="balance">Bakiye</SelectItem>
+                <SelectItem value="taxId">Vergi No</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+              title={sortDirection === 'asc' ? 'Artan' : 'Azalan'}
+            >
+              {sortDirection === 'asc' ? (
+                <ArrowUp className="h-4 w-4" />
+              ) : (
+                <ArrowDown className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

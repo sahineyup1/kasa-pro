@@ -21,6 +21,9 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,6 +144,8 @@ export default function CustomersPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [sortField, setSortField] = useState<string>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     // RTDB'den partners koleksiyonundan müşterileri dinle
@@ -221,6 +226,54 @@ export default function CustomersPage() {
     const matchesType = typeFilter === 'all' || type === typeFilter;
 
     return matchesSearch && matchesStatus && matchesType;
+  }).sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
+
+    switch (sortField) {
+      case 'code':
+        valueA = getField(a, 'code') || '';
+        valueB = getField(b, 'code') || '';
+        break;
+      case 'name':
+        valueA = getField(a, 'name') || getField(a, 'companyName') || '';
+        valueB = getField(b, 'name') || getField(b, 'companyName') || '';
+        break;
+      case 'city':
+        valueA = getField(a, 'city') || '';
+        valueB = getField(b, 'city') || '';
+        break;
+      case 'country':
+        valueA = getField(a, 'country') || '';
+        valueB = getField(b, 'country') || '';
+        break;
+      case 'balance':
+        valueA = getField(a, 'balance') || 0;
+        valueB = getField(b, 'balance') || 0;
+        break;
+      case 'createdAt':
+        valueA = a.createdAt || '';
+        valueB = b.createdAt || '';
+        break;
+      default:
+        valueA = getField(a, 'name') || '';
+        valueB = getField(b, 'name') || '';
+    }
+
+    // Numeric comparison for balance
+    if (sortField === 'balance') {
+      return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
+    }
+
+    // Natural sort for code (handles numeric strings properly: 1, 2, 10, 99, 100)
+    if (sortField === 'code') {
+      const comparison = String(valueA).localeCompare(String(valueB), 'tr', { numeric: true });
+      return sortDirection === 'asc' ? comparison : -comparison;
+    }
+
+    // String comparison
+    const comparison = String(valueA).localeCompare(String(valueB), 'tr');
+    return sortDirection === 'asc' ? comparison : -comparison;
   });
 
   // Stats
@@ -387,6 +440,35 @@ export default function CustomersPage() {
                 <SelectItem value="company">Kurumsal</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="flex items-center gap-2 border-l pl-4">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <Select value={sortField} onValueChange={setSortField}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Sırala" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">İsim</SelectItem>
+                  <SelectItem value="code">Kod</SelectItem>
+                  <SelectItem value="city">Şehir</SelectItem>
+                  <SelectItem value="country">Ülke</SelectItem>
+                  <SelectItem value="balance">Bakiye</SelectItem>
+                  <SelectItem value="createdAt">Eklenme</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                title={sortDirection === 'asc' ? 'Artan' : 'Azalan'}
+              >
+                {sortDirection === 'asc' ? (
+                  <ArrowUp className="h-4 w-4" />
+                ) : (
+                  <ArrowDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

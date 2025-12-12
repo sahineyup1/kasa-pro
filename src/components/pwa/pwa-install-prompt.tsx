@@ -17,6 +17,11 @@ export function PWAInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // B2B sayfalarında PWA prompt gösterme
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/b2b')) {
+      return;
+    }
+
     // iOS kontrolu
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
     setIsIOS(isIOSDevice);
@@ -27,9 +32,15 @@ export function PWAInstallPrompt() {
     setIsStandalone(isInStandaloneMode);
 
     // Daha once reddedilmis mi kontrol et
-    const dismissed = localStorage.getItem('pwa-install-dismissed');
-    const dismissedTime = dismissed ? parseInt(dismissed) : 0;
-    const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+    let dismissed: string | null = null;
+    let daysSinceDismissed = 999;
+    try {
+      dismissed = localStorage.getItem('pwa-install-dismissed');
+      const dismissedTime = dismissed ? parseInt(dismissed) : 0;
+      daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+    } catch (error) {
+      // localStorage erişim hatası - varsayılan değerlerle devam et
+    }
 
     // beforeinstallprompt eventi dinle
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -70,7 +81,11 @@ export function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    try {
+      localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    } catch (error) {
+      console.warn('localStorage yazma hatası:', error);
+    }
   };
 
   // Zaten yuklenmisse veya gosterilmeyecekse null don

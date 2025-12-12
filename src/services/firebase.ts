@@ -1,8 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { getDatabase, ref, get, set, push, update, remove, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import {
-  getFirestore,
+  initializeFirestore,
   collection,
   doc,
   getDoc,
@@ -15,7 +14,8 @@ import {
   where,
   orderBy,
   limit,
-  Timestamp
+  Timestamp,
+  memoryLocalCache
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -37,9 +37,19 @@ console.log('Firebase Config:', {
 
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
 const database = getDatabase(app);
-const firestore = getFirestore(app);
+
+// Firestore - IndexedDB yerine memory cache kullan (storage erişim hatalarını önler)
+let firestore: ReturnType<typeof initializeFirestore>;
+try {
+  firestore = initializeFirestore(app, {
+    localCache: memoryLocalCache()
+  });
+} catch (e) {
+  // Firestore zaten initialize edilmişse getFirestore kullan
+  const { getFirestore } = require('firebase/firestore');
+  firestore = getFirestore(app);
+}
 
 console.log('Firebase initialized, database:', database ? 'OK' : 'FAILED');
 console.log('Firestore initialized:', firestore ? 'OK' : 'FAILED');
@@ -336,8 +346,153 @@ export const subscribeToBranches = (
   });
 };
 
+// =================== SKT LOGS (Flutter ile uyumlu - prefix yok) ===================
+
+// Flutter'daki sktLogs koleksiyonuna erişim (prefix olmadan)
+export const getSktLogsCollection = (mainBarcode: string) => {
+  return collection(firestore, 'sktLogs', mainBarcode, 'lots');
+};
+
+// Ürünün lot listesini getir
+export const getProductLots = async (mainBarcode: string) => {
+  try {
+    const lotsCol = collection(firestore, 'sktLogs', mainBarcode, 'lots');
+    const snapshot = await getDocs(lotsCol);
+    const lots = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    // SKT'ye göre sırala (FIFO)
+    lots.sort((a: any, b: any) => {
+      const dateA = parseExpiryDate(a.expiryDate);
+      const dateB = parseExpiryDate(b.expiryDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    return lots;
+  } catch (error) {
+    console.error('getProductLots error:', error);
+    return [];
+  }
+};
+
+// SKT tarihini parse et (GG.AA.YYYY formatı)
+const parseExpiryDate = (dateStr: string): Date => {
+  if (!dateStr) return new Date(2100, 0, 1);
+  const parts = dateStr.split('.');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  }
+  return new Date(dateStr);
+};
+
+// Yeni lot ekle (alış faturasından)
+export const addProductLot = async (
+  mainBarcode: string,
+  productName: string,
+  expiryDate: string,
+  quantity: number,
+  userId: string,
+  invoiceNo?: string,
+  supplierId?: string
+) => {
+  try {
+    // Ana dokümanı oluştur/güncelle
+    const docRef = doc(firestore, 'sktLogs', mainBarcode);
+    await updateDoc(docRef, {
+      barcode: mainBarcode,
+      productName: productName,
+      updatedAt: new Date().toISOString(),
+    }).catch(async () => {
+      // Doküman yoksa oluştur
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(docRef, {
+        barcode: mainBarcode,
+        productName: productName,
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    // Lot sayısını al ve yeni lot ID oluştur
+    const lotsCol = collection(firestore, 'sktLogs', mainBarcode, 'lots');
+    const lotsSnap = await getDocs(lotsCol);
+    const lotId = `lot${lotsSnap.docs.length + 1}`;
+
+    // Yeni lot ekle
+    const lotRef = doc(lotsCol, lotId);
+    const { setDoc } = await import('firebase/firestore');
+    await setDoc(lotRef, {
+      lotNumber: lotId,
+      mainBarcode: mainBarcode,
+      expiryDate: expiryDate,
+      quantity: quantity,
+      createdAt: new Date().toISOString(),
+      userId: userId,
+      productName: productName,
+      source: 'purchase_invoice',
+      invoiceNo: invoiceNo || null,
+      supplierId: supplierId || null,
+    });
+
+    console.log(`✅ Lot eklendi: ${mainBarcode} → ${lotId}`);
+    return lotId;
+  } catch (error) {
+    console.error('addProductLot error:', error);
+    throw error;
+  }
+};
+
+// Lot miktarını güncelle (satış veya düzeltme için)
+export const updateLotQuantity = async (
+  mainBarcode: string,
+  lotId: string,
+  newQuantity: number
+) => {
+  try {
+    const lotRef = doc(firestore, 'sktLogs', mainBarcode, 'lots', lotId);
+    await updateDoc(lotRef, {
+      quantity: newQuantity,
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`✅ Lot güncellendi: ${mainBarcode}/${lotId} → ${newQuantity}`);
+  } catch (error) {
+    console.error('updateLotQuantity error:', error);
+    throw error;
+  }
+};
+
+// Ürünün toplam lot stokunu hesapla
+export const getProductLotStock = async (mainBarcode: string): Promise<number> => {
+  const lots = await getProductLots(mainBarcode);
+  return lots.reduce((sum: number, lot: any) => sum + (lot.quantity || 0), 0);
+};
+
+// SKT Logs koleksiyonunu dinle (real-time)
+export const subscribeToProductLots = (
+  mainBarcode: string,
+  callback: (lots: any[]) => void
+) => {
+  const lotsCol = collection(firestore, 'sktLogs', mainBarcode, 'lots');
+
+  return onSnapshot(lotsCol, (snapshot) => {
+    const lots = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    // SKT'ye göre sırala (FIFO)
+    lots.sort((a: any, b: any) => {
+      const dateA = parseExpiryDate(a.expiryDate);
+      const dateB = parseExpiryDate(b.expiryDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    callback(lots);
+  }, (error) => {
+    console.error('subscribeToProductLots error:', error);
+    callback([]);
+  });
+};
+
 export {
-  app, auth, database, firestore,
+  app, database, firestore,
   ref, get, set, push, update, remove, onValue, query, orderByChild, equalTo,
   collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot,
   firestoreQuery as fsQuery, where, orderBy, limit, Timestamp

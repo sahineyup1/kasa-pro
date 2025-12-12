@@ -9,11 +9,21 @@ interface SplashScreenProps {
 }
 
 export function SplashScreen({ onComplete, minDuration = 2500 }: SplashScreenProps) {
+  // Hydration uyumu için mounted state - SSR'de hiçbir şey render etme
+  const [mounted, setMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationPhase, setAnimationPhase] = useState(0);
 
   useEffect(() => {
+    setMounted(true);
+
+    // B2B sayfalarında splash gösterme - window.location kullan (hydration-safe)
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/b2b')) {
+      setIsVisible(false);
+      return;
+    }
+
     // Phase 1: Logo küçükten büyümeye başlar (başlangıçta)
     const phase1 = setTimeout(() => setAnimationPhase(1), 100);
 
@@ -36,6 +46,8 @@ export function SplashScreen({ onComplete, minDuration = 2500 }: SplashScreenPro
     };
   }, [minDuration, onComplete]);
 
+  // Hydration için bekle - SSR'de hiçbir şey render etme
+  if (!mounted) return null;
   if (!isVisible) return null;
 
   return (

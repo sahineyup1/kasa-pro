@@ -4,6 +4,7 @@ import "./globals.css";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { SplashScreen } from "@/components/splash/splash-screen";
+import { ErrorCatcher } from "@/components/error-catcher";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -59,10 +60,7 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
       <body className={inter.className}>
-        <SplashScreen minDuration={2000} />
         {children}
-        <PWAInstallPrompt />
-        <ServiceWorkerRegistration />
       </body>
     </html>
   );

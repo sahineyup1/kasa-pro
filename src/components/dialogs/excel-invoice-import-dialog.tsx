@@ -32,6 +32,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { addFirestoreData, subscribeToRTDB, subscribeToBranches } from '@/services/firebase';
+import { supplierMatcher } from '@/services/supplier-product-matcher';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -80,6 +81,15 @@ interface ParsedItem {
   matchedProductId?: string;
   matchedProductName?: string;
   matchStatus: 'matched' | 'suggested' | 'unmatched';
+  // Son fiyat karşılaştırması
+  lastPrice?: number;
+  lastPriceWithExpense?: number;
+  priceChange?: number; // Yüzde değişim
+  priceDirection?: 'up' | 'down' | 'same' | 'new';
+  // Masraf dağıtımı
+  expenseShare?: number; // Ürüne düşen masraf payı
+  unitExpense?: number; // Birim başına masraf
+  finalPrice?: number; // Masraf dahil birim fiyat
 }
 
 interface ColumnMapping {
@@ -137,7 +147,12 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
     const unsubSuppliers = subscribeToRTDB('partners', (data) => {
       if (data) {
         const supplierList = data
-          .filter((p: any) => p.basic?.type === 'supplier' || p.type === 'supplier')
+          .filter((p: any) => {
+            // Tedarikçi kontrolü: type.isSupplier veya basic.partnerTypes.isSupplier
+            const isSupplier = p.type?.isSupplier || p.basic?.partnerTypes?.isSupplier;
+            const isDeleted = p.basic?.status === 'deleted';
+            return isSupplier && !isDeleted;
+          })
           .map((p: any) => ({
             id: p.id || p._id,
             name: p.basic?.name || p.name || p.companyName || '',
@@ -235,47 +250,52 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
     return mapping;
   }, []);
 
-  // Match product helper
-  const matchProduct = useCallback((item: Partial<ParsedItem>, productList: Product[], currentSupplierId: string): Partial<ParsedItem> => {
-    // Try to match by our code first
+  // Match product helper - supplierMatcher kullanarak
+  const matchProduct = useCallback(async (
+    item: Partial<ParsedItem>,
+    productList: Product[],
+    currentSupplierId: string
+  ): Promise<Partial<ParsedItem>> => {
+    let result: Partial<ParsedItem> = { ...item, matchStatus: 'unmatched' };
+
+    // 1. Try to match by our code first (Bizim Sifra)
     if (item.ourCode) {
-      const matchByOurCode = productList.find(p =>
-        p.code?.toLowerCase() === item.ourCode?.toLowerCase()
-      );
+      const matchByOurCode = await supplierMatcher.searchByOurCode(item.ourCode);
       if (matchByOurCode) {
-        return {
+        result = {
           ...item,
           matchedProductId: matchByOurCode.id,
-          matchedProductName: matchByOurCode.name,
+          matchedProductName: matchByOurCode.basic?.name || matchByOurCode.name || '',
           matchStatus: 'matched',
         };
       }
     }
 
-    // Try to match by supplier code
-    if (item.supplierCode && currentSupplierId) {
-      const matchBySupplierCode = productList.find(p =>
-        p.supplierMappings?.[currentSupplierId]?.code?.toLowerCase() === item.supplierCode?.toLowerCase()
-      );
+    // 2. Try to match by supplier code (Tedarikci Kodu)
+    if (result.matchStatus !== 'matched' && item.supplierCode && currentSupplierId) {
+      const matchBySupplierCode = await supplierMatcher.search(currentSupplierId, item.supplierCode);
       if (matchBySupplierCode) {
-        return {
+        result = {
           ...item,
-          matchedProductId: matchBySupplierCode.id,
-          matchedProductName: matchBySupplierCode.name,
+          matchedProductId: matchBySupplierCode.productId,
+          matchedProductName: matchBySupplierCode.productName,
           matchStatus: 'matched',
+          // Son fiyat bilgisi
+          lastPrice: matchBySupplierCode.lastPrice,
+          lastPriceWithExpense: matchBySupplierCode.lastPriceWithExpense,
         };
       }
     }
 
-    // Try fuzzy name match
-    if (item.productName) {
+    // 3. Try fuzzy name match (fallback)
+    if (result.matchStatus !== 'matched' && item.productName) {
       const itemNameLower = item.productName.toLowerCase();
       const fuzzyMatch = productList.find(p =>
         p.name.toLowerCase().includes(itemNameLower) ||
         itemNameLower.includes(p.name.toLowerCase())
       );
       if (fuzzyMatch) {
-        return {
+        result = {
           ...item,
           matchedProductId: fuzzyMatch.id,
           matchedProductName: fuzzyMatch.name,
@@ -284,7 +304,16 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
       }
     }
 
-    return { ...item, matchStatus: 'unmatched' };
+    // 4. Calculate price change if we have last price
+    if (result.lastPrice && result.lastPrice > 0 && item.unitPrice) {
+      const priceInfo = supplierMatcher.calculatePriceChange(result.lastPrice, item.unitPrice);
+      result.priceChange = priceInfo.percent;
+      result.priceDirection = priceInfo.direction;
+    } else if (result.matchStatus === 'matched') {
+      result.priceDirection = 'new'; // İlk alış
+    }
+
+    return result;
   }, []);
 
   // Parse Excel file
@@ -342,9 +371,14 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
         matchStatus: 'unmatched',
       };
 
-      // Try to match product
-      const matched = matchProduct(item, products, supplierId);
+      // Try to match product (async)
+      const matched = await matchProduct(item, products, supplierId);
       items.push(matched as ParsedItem);
+    }
+
+    // Tedarikçi eşleştirmelerini önceden yükle
+    if (supplierId) {
+      await supplierMatcher.loadSupplierMappings(supplierId);
     }
 
     return items;
@@ -381,11 +415,17 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
   };
 
   // Re-match products when supplier changes
-  const rematchProducts = useCallback(() => {
-    const rematchedItems = parsedItems.map(item => {
-      const matched = matchProduct(item, products, supplierId);
-      return matched as ParsedItem;
-    });
+  const rematchProducts = useCallback(async () => {
+    // Tedarikçi eşleştirmelerini yükle
+    if (supplierId) {
+      await supplierMatcher.loadSupplierMappings(supplierId);
+    }
+
+    const rematchedItems: ParsedItem[] = [];
+    for (const item of parsedItems) {
+      const matched = await matchProduct(item, products, supplierId);
+      rematchedItems.push(matched as ParsedItem);
+    }
     setParsedItems(rematchedItems);
   }, [parsedItems, products, supplierId, matchProduct]);
 
@@ -410,6 +450,30 @@ export function ExcelInvoiceImportDialog({ open, onOpenChange, onSuccess }: Exce
   const totalTax = parsedItems.reduce((sum, i) => sum + (i.lineTotal * i.taxRate / 100), 0);
   const totalExpenses = transportCost + customsCost + otherExpenses;
   const grandTotal = subtotal + totalTax + totalExpenses;
+
+  // Masraf dağıtımını hesapla (orantılı - pro-rata)
+  const calculateExpenseDistribution = useCallback(() => {
+    if (subtotal === 0 || totalExpenses === 0) return parsedItems;
+
+    return parsedItems.map(item => {
+      // Masraf payı = (Ürün tutarı / Toplam) × Toplam Masraf
+      const expenseShare = (item.lineTotal / subtotal) * totalExpenses;
+      // Birim başına masraf = Masraf payı / Miktar
+      const unitExpense = item.quantity > 0 ? expenseShare / item.quantity : 0;
+      // Masraf dahil birim fiyat
+      const finalPrice = item.unitPrice + unitExpense;
+
+      return {
+        ...item,
+        expenseShare,
+        unitExpense,
+        finalPrice,
+      };
+    });
+  }, [parsedItems, subtotal, totalExpenses]);
+
+  // Masraf dağıtımlı ürünler
+  const itemsWithExpenses = calculateExpenseDistribution();
 
   // Stats
   const matchedCount = parsedItems.filter(i => i.matchStatus === 'matched').length;

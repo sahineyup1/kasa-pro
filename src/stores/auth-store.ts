@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface User {
   uid: string;
@@ -88,6 +88,39 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // Storage erişim hataları için güvenli storage
+      storage: createJSONStorage(() => {
+        if (typeof window === 'undefined') {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return {
+          getItem: (name) => {
+            try {
+              return localStorage.getItem(name);
+            } catch {
+              return null;
+            }
+          },
+          setItem: (name, value) => {
+            try {
+              localStorage.setItem(name, value);
+            } catch {
+              // Storage erişim hatası - sessizce devam et
+            }
+          },
+          removeItem: (name) => {
+            try {
+              localStorage.removeItem(name);
+            } catch {
+              // Storage erişim hatası - sessizce devam et
+            }
+          },
+        };
+      }),
       // Sadece guvenli alanlari persist et
       partialize: (state) => ({
         user: state.user,
